@@ -1,0 +1,293 @@
+---
+title: "statistical analysis"
+author: "Katharina Bremer"
+date: "2026-11-02"
+output: html_document
+---
+```{r}
+dir.exists('/Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer')
+```
+
+
+# Load the data
+```{r setup, include=FALSE}
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+library(patchwork)
+
+# subject courses
+subject_courses <- read.table('/Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer/Output/Flica_Output/ABIDE/iterations1500/FSL_Format/150ica_secondfilter/subjectCoursesOut.txt')
+subject_courses_tp <- t(subject_courses)
+
+# modality contirbutions
+modality_contributions <- read.table('/Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer/Output/Flica_Output/ABIDE/iterations1500/FSL_Format/150ica_secondfilter/Modality_contributions.txt')
+#this is shown as modalities in the rows and IC in the colums, we want to transpose it
+modality_contributions_tp <- t(modality_contributions)# now the columns are modalities
+
+subject_courses_tp <- subject_courses_tp[, colSums(subject_courses_tp == 0) != nrow(subject_courses_tp)]
+
+modality_contributions_tp[c(1), ]
+modality_contributions_tp[c(37), ]
+```
+
+# Between Group: autism vs. NAI
+```{r}
+# load phenotypic data
+behaviourals_all <- read.csv('/Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer/Scripts/R Studio/data/data_final/FSL_pheno_second_filter.csv')
+behaviourals_all$SUB_ID <- as.character(as.integer(behaviourals_all$SUB_ID)) #convert into string
+behaviourals_all$SITE_ID <- as.factor(behaviourals_all$SITE_ID) #categorical / factor
+
+# stats (ANCOVA, interaction)
+ICs <- ncol(subject_courses_tp)
+pvals_comb <- matrix(0, nrow=ICs, ncol=5)
+tvals_comb <- matrix(0, nrow=ICs, ncol=5)
+
+# loop over ICs
+for (i in 1:ICs){
+  y <- subject_courses_tp[,i]
+  x <- as.factor(behaviourals_all$DX_GROUP) #because categorical
+  z <- as.factor(behaviourals_all$SEX) #because categorical
+  c1 <- behaviourals_all$AGE_AT_SCAN #continuous
+  c2 <- as.factor(behaviourals_all$SITE_ID) #because categorical
+  
+  ols <- lm(y ~ x*z + c1 + c2) 
+  s <- summary(ols)
+  coef_table <- summary(ols)$coefficients
+
+  pvals_comb[i,1] <- coef_table["x2", "Pr(>|t|)"]
+  pvals_comb[i,2] <- coef_table["z2", "Pr(>|t|)"]
+  pvals_comb[i,3] <- coef_table["x2:z2", "Pr(>|t|)"]
+  pvals_comb[i,4] <- coef_table["c1", "Pr(>|t|)"]
+  pvals_comb[i,5] <- anova(ols)["c2", "Pr(>F)"]
+  tvals_comb[i,1] <- coef_table["x2", "t value"]
+  tvals_comb[i,2] <- coef_table["z2", "t value"]
+  tvals_comb[i,3] <- coef_table["x2:z2", "t value"]
+}
+
+y <- subject_courses_tp[, 37]
+summary(lm(y ~ x + z + c1 + c2))
+
+#FDR correction
+
+pvals_corrected_dx <- p.adjust(pvals_comb[,1], method="BH")
+pvals_corrected_sex <- p.adjust(pvals_comb[,2], method="BH")
+pvals_corrected_interaction <- p.adjust(pvals_comb[,3], method="BH")
+pvals_corrected_age <- p.adjust(pvals_comb[,4], method="BH")
+pvals_corrected_site <- p.adjust(pvals_comb[,5], method="BH")
+
+# Interaction
+sig_int <- which(pvals_corrected_interaction < 0.05)
+if(length(sig_int) > 0) {
+  cat("Interaction - significant ICs:", sig_int, "\n")
+} else {
+  cat("No significant interactions\n")
+} 
+
+
+
+# additive model (only main effect)
+
+ICs <- ncol(subject_courses_tp)
+pvals_add <- matrix(NA, nrow=ICs, ncol=4)
+tvals_add <- matrix(NA, nrow=ICs, ncol=4)
+
+# loop over ICs
+for (i in 1:ICs){
+  y <- subject_courses_tp[,i]
+  x <- as.factor(behaviourals_all$DX_GROUP) #because categorical
+  z <- as.factor(behaviourals_all$SEX) #because categorical
+  c1 <- behaviourals_all$AGE_AT_SCAN #continuous
+  c2 <- as.factor(behaviourals_all$SITE_ID) #because categorical
+  
+  ols <- lm(y ~ x + z + c1 + c2) 
+  s <- summary(ols)
+  coef_table <- summary(ols)$coefficients
+
+  pvals_add[i,1] <- coef_table["x2", "Pr(>|t|)"]
+  pvals_add[i,2] <- coef_table["z2", "Pr(>|t|)"]
+  pvals_add[i,3] <- coef_table["c1", "Pr(>|t|)"]
+  pvals_add[i,4] <- anova(ols)["c2", "Pr(>F)"]
+  tvals_add[i,1] <- coef_table["x2", "t value"]
+  tvals_add[i,2] <- coef_table["z2", "t value"]
+  tvals_add[i,3] <- coef_table["c1", "t value"]
+}
+
+# FDR correction
+pvals_add_dx   <- p.adjust(pvals_add[,1], method="BH")
+pvals_add_sex  <- p.adjust(pvals_add[,2], method="BH")
+pvals_add_age  <- p.adjust(pvals_add[,3], method="BH")
+pvals_add_site <- p.adjust(pvals_add[,4], method="BH")
+
+# Main effect of diagnosis
+sig_dx <- which(pvals_add_dx < 0.05)
+if(length(sig_dx) > 0) {
+  cat("Diagnosis - significant ICs:", colnames(subject_courses)[sig_dx], "\n")
+} else {
+  cat("No significant diagnosis effects\n")
+}
+
+#uncorrected 
+cat("IC37 diagnosis: t =", round(tvals_add[37, 1], 3),
+    "| p (uncorrected) =", signif(pvals_add[37, 1], 3),
+    "| p_FDR =", round(pvals_add_dx[37], 4), "\n")
+
+# diagnosis site interaction for IC37
+y <- subject_courses_tp[, 37]
+m0 <- lm(y ~ x + z + c1 + c2)
+m1 <- lm(y ~ x * c2 + z + c1)
+anova(m0, m1)  
+
+modality_contributions_tp[c(37), ]
+
+subject_courses_tp_dx <- data.frame(DX_GROUP = behaviourals_all$DX_GROUP, 
+                                      subject_courses_tp)
+
+plot_data <- subject_courses_tp_dx %>%
+  dplyr::select(DX_GROUP, X37) %>%
+  mutate(DX_GROUP = factor(DX_GROUP, labels = c("Autism", "Control"))) %>%
+  pivot_longer(cols = -DX_GROUP, names_to = "IC", values_to = "Loading") 
+
+png(file='/Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer/Output/Plots/subject_loading_group_differences.png')
+ggplot(plot_data, aes(x = DX_GROUP, y = Loading, fill = DX_GROUP, color = DX_GROUP)) +
+  geom_violin( alpha = 0.4) +
+  geom_jitter(width = 0.1, alpha = 0.5, size = 1.5) +
+  geom_boxplot(alpha = 0.7, outlier.shape = NA, width = 0.2, color = "black") +
+  facet_wrap(~ IC, labeller = label_both) +
+  theme_minimal()
+dev.off()
+
+tapply(subject_courses_tp[,37], behaviourals_all$DX_GROUP, mean)
+
+
+n1 <- sum(behaviourals_all$DX_GROUP == levels(as.factor(behaviourals_all$DX_GROUP))[1])
+n2 <- sum(behaviourals_all$DX_GROUP == levels(as.factor(behaviourals_all$DX_GROUP))[2])
+
+# degrees of freedom
+y   <- subject_courses_tp[, 37]
+ols <- lm(y ~ x + z + c1 + c2)
+df.residual(ols)              # df2 (should be 940 with 955 participants and 12 sites)
+tvals_add[37, 1]              # t
+tvals_add[37, 1]^2            # F = t²
+pvals_add_dx[37]              # FDR-corrected p
+d <- tvals_add[37, 1] * sqrt((n1 + n2) / (n1 * n2))
+
+```
+
+#controlling for age and sex and site ADOS 2
+```{r}
+# we want only ASD for these analyses
+behaviourals_all <- read.csv('/Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer/Scripts/R Studio/data/data_final/FSL_pheno_second_filter.csv')
+subject_courses_tp_ids <- data.frame(SUB_ID = behaviourals_all$SUB_ID, 
+                                      subject_courses_tp) # adding sub id to the subject courses
+
+behaviourals_ASD <- read.csv('/Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer/Output/Imputation/imputed_data_final_FSL.csv') # loading ASD data
+
+subject_courses_ASD <- subject_courses_tp_ids[match(behaviourals_ASD$SUB_ID, subject_courses_tp_ids$SUB_ID), ]
+all(subject_courses_ASD$SUB_ID == behaviourals_ASD$SUB_ID) #make sure the sub ids match
+cat("IDs in same order?", all(subject_courses_ASD$SUB_ID == behaviourals_ASD$SUB_ID))
+cat("Same IDs", all(sort(subject_courses_ASD$SUB_ID) == sort(behaviourals_ASD$SUB_ID)))
+
+subject_courses_ASD_matrix <- as.matrix(subject_courses_ASD[, -1])
+
+ICs <- ncol(subject_courses_ASD_matrix)
+behav_vars <- c("ADOS_2_total_gotham_harmonized", "ADOS_2_socaff_harmonized",
+                "ADOS_2_severity_harmonized",
+                "ADI_R_VERBAL_TOTAL_BV","ADI_R_SOCIAL_TOTAL_A", 
+                "ADI_R_NONVERBAL_TOTAL_BV", "ADOS_2_rrb_harmonized", "ADI_RRB_harmonized")
+
+# behav_vars <- c("ADOS_2_rrb_harmonized","ADI_RRB_harmonized" )
+
+
+pvals_matrix <- matrix(0, nrow = ICs, ncol = length(behav_vars), 
+                       dimnames = list(NULL, behav_vars))
+tvals_matrix <- matrix(0, nrow = ICs, ncol = length(behav_vars),
+                       dimnames = list(NULL, behav_vars))
+beta_matrix <- matrix(0, nrow = ICs, ncol = length(behav_vars),
+                      dimnames = list(NULL, behav_vars))
+
+for (v in seq_along(behav_vars)) {
+  var <- behav_vars[v]
+  for (i in 1:ICs) {
+    y  <- subject_courses_ASD_matrix[, i]
+    x  <- behaviourals_ASD[[var]]
+    c1 <- behaviourals_ASD$AGE_AT_SCAN
+    c2 <- as.factor(behaviourals_ASD$SEX)
+    c3 <- as.factor(behaviourals_ASD$SITE_ID)
+    
+    ols <- lm(y ~ x + c1 + c2 + c3)
+    pvals_matrix[i, v] <- summary(ols)$coefficients['x', 'Pr(>|t|)']
+    tvals_matrix[i, v] <- summary(ols)$coefficients['x', 't value']
+    beta_matrix[i, v]  <- summary(ols)$coefficients["x", "Estimate"]
+  }
+}
+
+# joint FDR correction across all values at once
+pvals_corrected <- matrix(p.adjust(pvals_matrix, method = "BH"), 
+                          nrow = ICs, ncol = length(behav_vars),
+                          dimnames = list(NULL, behav_vars))
+
+# print significant results
+for (var in behav_vars) {
+  sig <- which(pvals_corrected[, var] < 0.05)
+  if (length(sig) > 0) {
+    cat(var, "- significant ICs:", sig,
+    "| b =", round(beta_matrix[sig, var], 3),
+    "| t =", round(tvals_matrix[sig, var], 3),
+    "| p_fdr =", round(pvals_corrected[sig, var], 4), "\n")
+  }
+}
+
+ols <- lm(subject_courses_ASD_matrix[,1] ~ behaviourals_ASD$ADOS_2_total_gotham_harmonized +
+          behaviourals_ASD$AGE_AT_SCAN + as.factor(behaviourals_ASD$SEX) +
+          as.factor(behaviourals_ASD$SITE_ID))
+df.residual(ols)
+
+# Higher IC1 loadings are associated with higher ADOS scores.
+# Participants with more severe autism symptoms show stronger expression of the IC1 pattern.
+
+
+
+# plot for thesis
+library(ggplot2)
+library(patchwork)
+
+scatter_theme <- theme_minimal(base_size = 8) +
+  theme(
+    panel.grid.minor = element_blank(),
+    plot.title       = element_text(size = 8, face = "bold"),
+    axis.title       = element_text(size = 8),
+    axis.text        = element_text(size = 7)
+  )
+
+make_scatter <- function(x, xlab, ttl) {
+  df <- data.frame(ADOS = x, IC1 = subject_courses_ASD_matrix[, 1])
+  ggplot(df, aes(x = ADOS, y = IC1)) +
+    geom_jitter(width = 0.2, height = 0, alpha = 0.4, size = 0.8, colour = "navy") +
+    geom_smooth(method = "lm", colour = "red", fill = "pink", linewidth = 0.6) +
+    scatter_theme +
+    labs(title = ttl, x = xlab, y = "IC1 loading")
+}
+
+s_total <- make_scatter(behaviourals_ASD$ADOS_2_total_gotham_harmonized,
+                        "ADOS-2 total", "ADOS-2 total")
+s_css   <- make_scatter(behaviourals_ASD$ADOS_2_severity_harmonized,
+                        "ADOS-2 CSS", "ADOS-2 calibrated severity")
+
+p_scatter <- s_total + s_css
+p_scatter
+
+ggsave('/Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer/Output/Plots/IC1_ADOS_scatter_panel.pdf',
+       p_scatter, width = 11.5, height = 4.5, units = "cm")
+
+#standardised beta
+y <- subject_courses_ASD_matrix[, 1]
+
+for (var in c("ADOS_2_total_gotham_harmonized", "ADOS_2_severity_harmonized")) {
+  ols <- lm(scale(y) ~ scale(behaviourals_ASD[[var]]) +
+              behaviourals_ASD$AGE_AT_SCAN +
+              as.factor(behaviourals_ASD$SEX) +
+              as.factor(behaviourals_ASD$SITE_ID))
+  print(round(summary(ols)$coefficients[2, ], 3))   # beta, SE, t, p
+}
+```
