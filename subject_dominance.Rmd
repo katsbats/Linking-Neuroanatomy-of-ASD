@@ -1,0 +1,127 @@
+---
+title: "dominant subjects"
+author: "Katharina Bremer"
+date: "2026-11-02"
+output: html_document
+---
+
+# looking at dominant subjects
+```{r}
+H <- as.matrix(read.table('/Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer/Output/Flica_Output/ABIDE/iterations1500/FSL_Format/150ica_wholesample/subjectCoursesOut.txt', header=FALSE)) #load in the subjects as component x subject 
+
+# Dominance fraction for each component (as calculated by Llera)
+subj_max <- apply(H^2, 1, max)
+subj_total <- rowSums(H^2)
+subj_dom <- subj_max / subj_total
+
+dominant_subject <- apply(H^2, 1, which.max) #which subject dominates per component
+
+# Summary table
+dominance_df <- data.frame(
+  Component = 1:(nrow(H)),
+  DominantSubject = dominant_subject,
+  DominanceFraction = subj_dom
+)
+
+print(dominance_df)
+
+#using 0.02 as a threshold (which means max 2% of a component can be explained by one subject)
+bad_components_0.02 <- dominance_df$Component[
+  dominance_df$DominanceFraction > 0.02
+]
+
+bad_components_0.02_df <- data.frame(Component = bad_components_0.02)
+
+bad_components_0.02_info <- dominance_df[dominance_df$Component %in% bad_components_0.02_df$Component,]
+
+removesubs_002 <- unique(bad_components_0.02_info$DominantSubject)
+
+removesubs_002
+```
+
+# removing the subjects with high subject dominance
+```{r}
+
+subj_list <-as.matrix(read.table('/Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer/Input/ABIDEu30_final_subs.txt', header=FALSE)) 
+
+subj_list_cleaned <- subj_list[-removesubs_002, ]
+
+subj_list_cleaned <- as.matrix(subj_list_cleaned)
+
+nrow(subj_list) - nrow(subj_list_cleaned) 
+
+
+#check characterization
+write.table(subj_list_cleaned, '/Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer/Input/FSL_first_filter.txt', row.names=FALSE, col.names=FALSE, quote=FALSE)
+
+
+#we need to take out stanford now (see: characterization script on FSL_first_filter. The amount of subjects in the sex x diagnosis groups is too small)
+
+stanford <-as.matrix(read.table("/Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer/Scripts/R Studio/Data/stanford_subs.txt", header=FALSE))
+
+stanford_rows <- which(subj_list_cleaned %in% stanford)
+subj_list_cleaned <- subj_list_cleaned[-stanford_rows, ]
+
+subj_list_cleaned <- as.matrix(subj_list_cleaned)
+
+#without stanford
+write.table(subj_list_cleaned[,1], '/Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer/Input/FSL_first_filter.txt',
+            row.names = FALSE,
+            col.names = FALSE,
+            quote = FALSE)
+
+```
+
+# second filtering
+```{r}
+H <- as.matrix(read.table('/Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer/Output/Flica_Output/ABIDE/iterations1500/FSL_Format/150ica_firstfilter/subjectCoursesOut.txt', header=FALSE)) #load in the subjects as component x subject 
+dim(H)
+# Dominance fraction for each component (as calculated by Llera)
+subj_max <- apply(H^2, 1, max)
+subj_total <- rowSums(H^2)
+subj_dom <- subj_max / subj_total
+
+dominant_subject <- apply(H^2, 1, which.max) #which subject dominates per component
+
+# Summary table
+dominance_df <- data.frame(
+  Component = 1:(nrow(H)),
+  DominantSubject = dominant_subject,
+  DominanceFraction = subj_dom
+)
+
+print(dominance_df)
+
+#using 0.02 as a threshold (which means max 2% of a component can be explained by one subject)
+bad_components_0.02 <- dominance_df$Component[
+  dominance_df$DominanceFraction > 0.02
+]
+
+bad_components_0.02_df <- data.frame(Component = bad_components_0.02)
+
+bad_components_0.02_info <- dominance_df[dominance_df$Component %in% bad_components_0.02_df$Component,]
+
+removesubs_002 <- unique(bad_components_0.02_info$DominantSubject)
+
+removesubs_002
+
+```
+
+```{r}
+
+subj_list <-as.matrix(read.table('/Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer/Input/FSL_first_filter.txt', header=FALSE)) 
+ncol(H) == nrow(subj_list) #this is why we can remove by index
+
+subj_list_cleaned <- subj_list[-removesubs_002, ]
+
+subj_list_cleaned <- as.matrix(subj_list_cleaned)
+
+nrow(subj_list) - nrow(subj_list_cleaned) 
+
+
+#check characterization
+write.table(subj_list_cleaned, '/Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer/Input/FSL_second_filter.txt', row.names=FALSE, col.names=FALSE, quote=FALSE)
+
+```
+
+
