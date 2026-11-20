@@ -1,0 +1,985 @@
+---
+title: "Spatialmap Overlaps"
+author: "Katharina Bremer"
+date: "2026-11-04"
+output: html_document
+---
+
+# Packages
+```{r}
+library(ggplot2)
+library(patchwork)
+library(officer)
+library(readxl)
+library(dplyr)
+library(RColorBrewer)
+library(tidyr)
+library(flextable)
+```
+
+# IC 37
+## Harvard-Oxford
+```{r}
+# VBM
+VBM <- read.table('/Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer/Output/Flica_Output/ABIDE/iterations1500/FSL_format/150ica_secondfilter/VBM_R/Overlap_percentages.txt',
+                  sep = "=",
+                  header = FALSE,
+                  strip.white = TRUE,
+                  fill = TRUE)
+
+labels <- readxl::read_xlsx('/Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer/HOA/HarvardOxford_Atlas_NewIndex_YCG.xlsx')
+
+which(colnames(labels) == "HOA Index")
+labels <- labels[,-3]
+which(colnames(labels) == "Hemisphere")
+labels <- labels[,-4]
+which(colnames(labels) == "Order")
+labels <- labels[,-1]
+
+# changing label names
+labels$Nomenclature <- dplyr::recode(labels$Nomenclature,
+  "Juxtapositional Lobule Cortex (formerly Supplementary Motor Cortex)" = "Juxtapositional Lobule Cortex",
+  "Superior Frontal Gyrus" = "SFG",
+  "Middle Frontal Gyrus" = "MFG",
+  "Inferior Frontal Gyrus, pars triangularis" = "IFG, pars triangularis",
+  "Inferior Frontal Gyrus, pars opercularis" = "IFG, pars opercularis",
+  "Superior Temporal Gyrus, anterior division" = "STG, anterior",
+  "Superior Temporal Gyrus, posterior division" = "STG, posterior",
+  "Middle Temporal Gyrus, anterior division" = "MTG, anterior",
+  "Middle Temporal Gyrus, posterior division" = "MTG, posterior",
+  "Middle Temporal Gyrus, temporooccipital part" = "MTG, temporo-occipital",
+  "Inferior Temporal Gyrus, anterior division" = "ITG, anterior",
+  "Inferior Temporal Gyrus, posterior division" = "ITG, posterior",
+  "Inferior Temporal Gyrus, temporooccipital part" = "ITG, temporo-occipital",
+  "Superior Parietal Lobule" = "SPL",
+  "Supramarginal Gyrus, anterior division" = "SMG, anterior",
+  "Supramarginal Gyrus, posterior division" = "SMG, posterior",
+  "Lateral Occipital Cortex, superior division" = "LOC, superior",
+  "Lateral Occipital Cortex, inferior division" = "LOC, inferior",
+  "Cingulate Gyrus, anterior division" = "ACC",
+  "Cingulate Gyrus, posterior division" = "PCC",
+  "Precuneous Cortex" = "Precuneus",
+  "Parahippocampal Gyrus, anterior division" = "PHG, anterior",
+  "Parahippocampal Gyrus, posterior division" = "PHG, posterior",
+  "Temporal Fusiform Cortex, anterior division" = "Fusiform, anterior",
+  "Temporal Fusiform Cortex, posterior division" = "Fusiform, posterior",
+  "Temporal Occipital Fusiform Cortex" = "Temporo-occipital Fusiform",
+  "Occipital Fusiform Gyrus" = "Occipital Fusiform",
+  "Frontal Orbital Cortex" = "Frontal Orbital",
+  "Frontal Operculum Cortex" = "Frontal Operculum",
+  "Central Opercular Cortex" = "Central Operculum",
+  "Parietal Operculum Cortex" = "Parietal Operculum",
+  "Intracalcarine Cortex" = "Intracalcarine",
+  "Frontal Medial Cortex" = "Frontal Medial",
+  "Subcallosal Cortex" = "Subcallosal",
+  "Cuneal Cortex" = "Cuneus",
+  "Supracalcarine Cortex" = "Supracalcarine",
+  "Heschls Gyrus (includes H1 and H2)" = "Heschl's Gyrus",
+  "Insular Cortex" = "Insula",
+  "Paracingulate Gyrus" = "Paracingulate"
+)
+
+colnames(VBM) <- c("index", "IC", "direction", "modality", "hemisphere", "atlas", "overlap_pct")
+
+# renaming and removing columns 
+VBM_37 <- VBM[VBM$IC == "IC36", ]
+VBM_37 <- merge(VBM_37, labels, by.x = "index", by.y = "New Index")
+VBM_37 <- VBM_37[,-2]
+VBM_37 <- VBM_37[VBM_37$overlap_pct != 0, ]
+VBM_37 <- VBM_37 [order(VBM_37$overlap_pct, decreasing = TRUE),]
+
+colnames(VBM_37) 
+VBM_37 <- VBM_37[, c(7, 2, 3, 4, 6, 5,1)]
+colnames(VBM_37) <-  c("StructName", "direction", "modality", "hemisphere", "overlap_pct", "atlas", "index")  
+colnames(VBM_37)
+
+
+# JD
+JD <- read.table('/Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer/Output/Flica_Output/ABIDE/iterations1500/FSL_format/150ica_secondfilter/JD_R/Overlap_percentages.txt',
+                 sep = "=",
+                 header = FALSE,
+                 strip.white = TRUE,
+                 fill = TRUE)
+
+labels <- readxl::read_xlsx('/Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer/HOA/HarvardOxford_Atlas_NewIndex_YCG.xlsx')
+
+which(colnames(labels) == "HOA Index")
+labels <- labels[,-3]
+which(colnames(labels) == "Hemisphere")
+labels <- labels[,-4]
+which(colnames(labels) == "Order")
+labels <- labels[,-1]
+
+# changing label names
+labels$Nomenclature <- dplyr::recode(labels$Nomenclature,
+  "Juxtapositional Lobule Cortex (formerly Supplementary Motor Cortex)" = "Juxtapositional Lobule Cortex",
+  "Superior Frontal Gyrus" = "SFG",
+  "Middle Frontal Gyrus" = "MFG",
+  "Inferior Frontal Gyrus, pars triangularis" = "IFG, pars triangularis",
+  "Inferior Frontal Gyrus, pars opercularis" = "IFG, pars opercularis",
+  "Superior Temporal Gyrus, anterior division" = "STG, anterior",
+  "Superior Temporal Gyrus, posterior division" = "STG, posterior",
+  "Middle Temporal Gyrus, anterior division" = "MTG, anterior",
+  "Middle Temporal Gyrus, posterior division" = "MTG, posterior",
+  "Middle Temporal Gyrus, temporooccipital part" = "MTG, temporo-occipital",
+  "Inferior Temporal Gyrus, anterior division" = "ITG, anterior",
+  "Inferior Temporal Gyrus, posterior division" = "ITG, posterior",
+  "Inferior Temporal Gyrus, temporooccipital part" = "ITG, temporo-occipital",
+  "Superior Parietal Lobule" = "SPL",
+  "Supramarginal Gyrus, anterior division" = "SMG, anterior",
+  "Supramarginal Gyrus, posterior division" = "SMG, posterior",
+  "Lateral Occipital Cortex, superior division" = "LOC, superior",
+  "Lateral Occipital Cortex, inferior division" = "LOC, inferior",
+  "Cingulate Gyrus, anterior division" = "ACC",
+  "Cingulate Gyrus, posterior division" = "PCC",
+  "Precuneous Cortex" = "Precuneus",
+  "Parahippocampal Gyrus, anterior division" = "PHG, anterior",
+  "Parahippocampal Gyrus, posterior division" = "PHG, posterior",
+  "Temporal Fusiform Cortex, anterior division" = "Fusiform, anterior",
+  "Temporal Fusiform Cortex, posterior division" = "Fusiform, posterior",
+  "Temporal Occipital Fusiform Cortex" = "Temporo-occipital Fusiform",
+  "Occipital Fusiform Gyrus" = "Occipital Fusiform",
+  "Frontal Orbital Cortex" = "Frontal Orbital",
+  "Frontal Operculum Cortex" = "Frontal Operculum",
+  "Central Opercular Cortex" = "Central Operculum",
+  "Parietal Operculum Cortex" = "Parietal Operculum",
+  "Intracalcarine Cortex" = "Intracalcarine",
+  "Frontal Medial Cortex" = "Frontal Medial",
+  "Subcallosal Cortex" = "Subcallosal",
+  "Cuneal Cortex" = "Cuneus",
+  "Supracalcarine Cortex" = "Supracalcarine",
+  "Heschls Gyrus (includes H1 and H2)" = "Heschl's Gyrus",
+  "Insular Cortex" = "Insula",
+  "Paracingulate Gyrus" = "Paracingulate",
+)
+
+# renaming and removing columns 
+colnames(JD) <- c("index", "IC", "direction", "modality", "hemisphere", "atlas", "overlap_pct")
+JD_37 <- JD[JD$IC == "IC36", ]
+JD_37 <- merge(JD_37, labels, by.x = "index", by.y = "New Index")
+JD_37 <- JD_37[JD_37$overlap_pct != 0, ]
+JD_37 <- JD_37[,-2]
+JD_37 <- JD_37 [order(JD_37$overlap_pct, decreasing = TRUE),]
+
+colnames(JD_37) 
+JD_37 <- JD_37[, c(7, 2, 3, 4,6,5,1)]
+colnames(JD_37) <-  c("StructName", "direction", "modality", "hemisphere", "overlap_pct", "atlas", "index")  
+colnames(JD_37)
+
+```
+
+## Destrieux
+```{r}
+#Cortical Thickness
+CT <- read.table('/Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer/Output/Flica_Output/ABIDE/iterations1500/FSL_format/150ica_secondfilter/CT_R/Overlap_percentages_bin_surface.txt', comment.char = "#")
+
+CT <- CT[,-2]
+CT <- CT[,-3]
+CT <-CT[,-4]
+CT <- CT[,-5]
+CT <- CT[,-6]
+CT <- CT[,-2]#remove IC because we only have one
+
+
+colnames(CT) <- c("StructName", "direction", "modality","hemisphere", "overlap_pct")  
+CT <- CT [order(CT$overlap_pct, decreasing = TRUE),]
+
+CT <- distinct(CT)
+
+# renaming the labels 
+CT$StructName <- dplyr::recode(CT$StructName,
+  "G_front_sup" = "Superior Frontal",
+  "S_central" = "Central Sulcus",
+  "G_parietal_sup" = "Superior Parietal",
+  "G_precuneus" = "Precuneus",
+  "S_orbital-H_Shaped" = "H-shaped Orbital Sulcus",
+  "G_precentral" = "Precentral",
+  "G_pariet_inf-Supramar" = "Supramarginal",
+  "G_and_S_cingul-Ant" = "Anterior Cingulate",
+  "G_occipital_sup" = "Superior Occipital",
+  "G_and_S_paracentral" = "Paracentral",
+  "S_circular_insula_inf" = "Inferior Circular Insula",
+  "S_front_inf" = "Inferior Frontal Sulcus",
+  "G_Ins_lg_and_S_cent_ins" = "Long Insular Gyrus",
+  "G_temporal_middle" = "Middle Temporal",
+  "S_cingul-Marginalis" = "Marginal Cingulate Sulcus",
+  "S_intrapariet_and_P_trans" = "Intraparietal Sulcus",
+  "G_front_middle" = "Middle Frontal",
+  "S_postcentral" = "Postcentral Sulcus",
+  "G_oc-temp_med-Parahip" = "Parahippocampal",
+  "Pole_temporal" = "Temporal Pole",
+  "S_orbital_med-olfact" = "Medial Orbital Sulcus",
+  "G_temporal_inf" = "Inferior Temporal",
+  "S_circular_insula_sup" = "Superior Circular Insula",
+  "G_and_S_subcentral" = "Subcentral",
+  "G_insular_short" = "Short Insular Gyrus",
+  "S_temporal_inf" = "Inferior Temporal Sulcus",
+  "G_orbital" = "Orbital Gyrus",
+  "S_precentral-inf-part" = "Inferior Precentral Sulcus",
+  "S_calcarine" = "Calcarine Sulcus",
+  "G_cingul-Post-ventral" = "Ventral Posterior Cingulate",
+  "G_postcentral" = "Postcentral",
+  "S_subparietal" = "Subparietal Sulcus",
+  "G_cuneus" = "Cuneus",
+  "S_front_sup" = "Superior Frontal Sulcus",
+  "S_pericallosal" = "Pericallosal Sulcus",
+  "G_temp_sup-Plan_tempo" = "Planum Temporale",
+  "Lat_Fis-post" = "Posterior Lateral Fissure",
+  "S_precentral-sup-part" = "Superior Precentral Sulcus",
+  "S_temporal_sup" = "Superior Temporal Sulcus",
+  "G_pariet_inf-Angular" = "Angular Gyrus",
+  "G_oc-temp_lat-fusifor" = "Fusiform",
+  "S_oc_sup_and_transversal" = "Superior Occipital Sulcus",
+  "G_subcallosal" = "Subcallosal",
+  "G_cingul-Post-dorsal" = "Dorsal Posterior Cingulate",
+  "G_and_S_cingul-Mid-Post" = "Mid-Posterior Cingulate",
+  "G_occipital_middle" = "Middle Occipital",
+  "G_temp_sup-Plan_polar" = "Planum Polare",
+  "Lat_Fis-ant-Vertical" = "Anterior Lateral Fissure",
+  "G_front_inf-Triangul" = "Inferior Frontal, pars triangularis",
+  "S_front_middle" = "Middle Frontal Sulcus",
+  "G_rectus" = "Gyrus Rectus",
+  "S_oc-temp_lat" = "Occipitotemporal Sulcus",
+  "G_temp_sup-Lateral" = "Lateral Superior Temporal",
+  "S_parieto_occipital" = "Parieto-occipital Sulcus",
+  "S_suborbital" = "Suborbital Sulcus",
+  "S_orbital_lateral" = "Lateral Orbital Sulcus",
+  "Lat_Fis-ant-Horizont" = "Anterior Horizontal Fissure",
+    "S_collat_transv_ant" = "Anterior Transverse Collateral Sulcus",
+  "S_temporal_transverse" = "Transverse Temporal Sulcus",
+  "G_oc-temp_med-Lingual" = "Lingual Gyrus",
+  "S_oc-temp_med_and_Lingual" = "Collateral Sulcus",
+  "G_and_S_cingul-Mid-Ant" = "Anterior Midcingulate Cortex",
+  "G_and_S_occipital_inf" = "Inferior Occipital Gyrus and Sulcus",
+  "G_temp_sup-G_T_transv" = "Transverse Temporal Gyrus (Heschl's Gyrus)",
+  "S_oc_middle_and_Lunatus" = "Middle Occipital and Lunate Sulcus",
+  "G_front_inf-Opercular" = "Inferior Frontal Gyrus, pars opercularis"
+)
+
+# Pial Area
+PA <- read.table('/Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer/Output/Flica_Output/ABIDE/iterations1500/FSL_format/150ica_secondfilter/PA_R/Overlap_percentages_bin_surface.txt', comment.char = "#")
+
+PA <- PA[,-2]
+PA <- PA[,-3]
+PA <- PA[,-4]
+PA <- PA[,-5]
+PA <- PA[,-6]
+PA <- PA[,-2]#remove IC because we only have one
+
+
+colnames(PA) <- c("StructName", "direction", "modality","hemisphere", "overlap_pct")  
+PA <- PA [order(PA$overlap_pct, decreasing = TRUE),]
+PA <- distinct(PA)
+
+# renaming the labels 
+PA$StructName <- dplyr::recode(PA$StructName,
+  "G_front_sup" = "Superior Frontal",
+  "S_central" = "Central Sulcus",
+  "G_parietal_sup" = "Superior Parietal",
+  "G_precuneus" = "Precuneus",
+  "S_orbital-H_Shaped" = "H-shaped Orbital Sulcus",
+  "G_precentral" = "Precentral",
+  "G_pariet_inf-Supramar" = "Supramarginal",
+  "G_and_S_cingul-Ant" = "Anterior Cingulate",
+  "G_occipital_sup" = "Superior Occipital",
+  "G_and_S_paracentral" = "Paracentral",
+  "S_circular_insula_inf" = "Inferior Circular Insula",
+  "S_front_inf" = "Inferior Frontal Sulcus",
+  "G_Ins_lg_and_S_cent_ins" = "Long Insular Gyrus",
+  "G_temporal_middle" = "Middle Temporal",
+  "S_cingul-Marginalis" = "Marginal Cingulate Sulcus",
+  "S_intrapariet_and_P_trans" = "Intraparietal Sulcus",
+  "G_front_middle" = "Middle Frontal",
+  "S_postcentral" = "Postcentral Sulcus",
+  "G_oc-temp_med-Parahip" = "Parahippocampal",
+  "Pole_temporal" = "Temporal Pole",
+  "S_orbital_med-olfact" = "Medial Orbital Sulcus",
+  "G_temporal_inf" = "Inferior Temporal",
+  "S_circular_insula_sup" = "Superior Circular Insula",
+  "G_and_S_subcentral" = "Subcentral",
+  "G_insular_short" = "Short Insular Gyrus",
+  "S_temporal_inf" = "Inferior Temporal Sulcus",
+  "G_orbital" = "Orbital Gyrus",
+  "S_precentral-inf-part" = "Inferior Precentral Sulcus",
+  "S_calcarine" = "Calcarine Sulcus",
+  "G_cingul-Post-ventral" = "Ventral Posterior Cingulate",
+  "G_postcentral" = "Postcentral",
+  "S_subparietal" = "Subparietal Sulcus",
+  "G_cuneus" = "Cuneus",
+  "S_front_sup" = "Superior Frontal Sulcus",
+  "S_pericallosal" = "Pericallosal Sulcus",
+  "G_temp_sup-Plan_tempo" = "Planum Temporale",
+  "Lat_Fis-post" = "Posterior Lateral Fissure",
+  "S_precentral-sup-part" = "Superior Precentral Sulcus",
+  "S_temporal_sup" = "Superior Temporal Sulcus",
+  "G_pariet_inf-Angular" = "Angular Gyrus",
+  "G_oc-temp_lat-fusifor" = "Fusiform",
+  "S_oc_sup_and_transversal" = "Superior Occipital Sulcus",
+  "G_subcallosal" = "Subcallosal",
+  "G_cingul-Post-dorsal" = "Dorsal Posterior Cingulate",
+  "G_and_S_cingul-Mid-Post" = "Mid-Posterior Cingulate",
+  "G_occipital_middle" = "Middle Occipital",
+  "G_temp_sup-Plan_polar" = "Planum Polare",
+  "Lat_Fis-ant-Vertical" = "Anterior Lateral Fissure",
+  "G_front_inf-Triangul" = "Inferior Frontal, pars triangularis",
+  "S_front_middle" = "Middle Frontal Sulcus",
+  "G_rectus" = "Gyrus Rectus",
+  "S_oc-temp_lat" = "Occipitotemporal Sulcus",
+  "G_temp_sup-Lateral" = "Lateral Superior Temporal",
+  "S_parieto_occipital" = "Parieto-occipital Sulcus",
+  "S_suborbital" = "Suborbital Sulcus",
+  "S_orbital_lateral" = "Lateral Orbital Sulcus",
+  "Lat_Fis-ant-Horizont" = "Anterior Horizontal Fissure",
+  "S_collat_transv_ant" = "Anterior Transverse Collateral Sulcus",
+  "S_temporal_transverse" = "Transverse Temporal Sulcus",
+  "G_oc-temp_med-Lingual" = "Lingual Gyrus",
+  "S_oc-temp_med_and_Lingual" = "Collateral Sulcus",
+  "G_and_S_cingul-Mid-Ant" = "Anterior Midcingulate Cortex",
+  "G_and_S_occipital_inf" = "Inferior Occipital Gyrus and Sulcus",
+  "G_temp_sup-G_T_transv" = "Transverse Temporal Gyrus (Heschl's Gyrus)",
+  "S_oc_middle_and_Lunatus" = "Middle Occipital and Lunate Sulcus",
+  "G_front_inf-Opercular" = "Inferior Frontal Gyrus, pars opercularis"
+)
+
+# combining the data 
+vol_data <- rbind(VBM_37, JD_37)
+surf_data <- rbind(CT, PA)
+
+surf_data$hemisphere <- ifelse(surf_data$hemisphere == "lh", "L", "R")
+
+# write.csv(VBM_37, '/Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer/Output/Plots/vbm_37.csv', row.names = FALSE)
+# write.csv(JD_37, '/Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer/Output/Plots/jd_37.csv', row.names = FALSE)
+# write.csv(vol_data, '/Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer/Output/Plots/vol_data_IC37.csv', row.names = FALSE)
+# write.csv(surf_data, '/Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer/Output/Plots/surf_data_IC37.csv', row.names = FALSE)
+```
+
+# IC1
+## Harvard-Oxford
+```{r}
+# VBM 
+vbm1 <- read.table('/Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer/Output/Flica_Output/ABIDE/iterations1500/FSL_format/150ica_secondfilter/VBM_R/Overlap_percentages_IC1.txt',
+                  sep = "=",
+                  header = FALSE,
+                  strip.white = TRUE,
+                  fill = TRUE)
+
+labels <- readxl::read_xlsx('/Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer/HOA/HarvardOxford_Atlas_NewIndex_YCG.xlsx')
+
+which(colnames(labels) == "HOA Index")
+labels <- labels[,-3]
+which(colnames(labels) == "Hemisphere")
+labels <- labels[,-4]
+which(colnames(labels) == "Order")
+labels <- labels[,-1]
+
+# renaming the lables 
+labels$Nomenclature <- dplyr::recode(labels$Nomenclature,
+  "Juxtapositional Lobule Cortex (formerly Supplementary Motor Cortex)" = "Juxtapositional Lobule Cortex",
+  "Superior Frontal Gyrus" = "SFG",
+  "Middle Frontal Gyrus" = "MFG",
+  "Inferior Frontal Gyrus, pars triangularis" = "IFG, pars triangularis",
+  "Inferior Frontal Gyrus, pars opercularis" = "IFG, pars opercularis",
+  "Superior Temporal Gyrus, anterior division" = "STG, anterior",
+  "Superior Temporal Gyrus, posterior division" = "STG, posterior",
+  "Middle Temporal Gyrus, anterior division" = "MTG, anterior",
+  "Middle Temporal Gyrus, posterior division" = "MTG, posterior",
+  "Middle Temporal Gyrus, temporooccipital part" = "MTG, temporo-occipital",
+  "Inferior Temporal Gyrus, anterior division" = "ITG, anterior",
+  "Inferior Temporal Gyrus, posterior division" = "ITG, posterior",
+  "Inferior Temporal Gyrus, temporooccipital part" = "ITG, temporo-occipital",
+  "Superior Parietal Lobule" = "SPL",
+  "Supramarginal Gyrus, anterior division" = "SMG, anterior",
+  "Supramarginal Gyrus, posterior division" = "SMG, posterior",
+  "Lateral Occipital Cortex, superior division" = "LOC, superior",
+  "Lateral Occipital Cortex, inferior division" = "LOC, inferior",
+  "Cingulate Gyrus, anterior division" = "ACC",
+  "Cingulate Gyrus, posterior division" = "PCC",
+  "Precuneous Cortex" = "Precuneus",
+  "Parahippocampal Gyrus, anterior division" = "PHG, anterior",
+  "Parahippocampal Gyrus, posterior division" = "PHG, posterior",
+  "Temporal Fusiform Cortex, anterior division" = "Fusiform, anterior",
+  "Temporal Fusiform Cortex, posterior division" = "Fusiform, posterior",
+  "Temporal Occipital Fusiform Cortex" = "Temporo-occipital Fusiform",
+  "Occipital Fusiform Gyrus" = "Occipital Fusiform",
+  "Frontal Orbital Cortex" = "Frontal Orbital",
+  "Frontal Operculum Cortex" = "Frontal Operculum",
+  "Central Opercular Cortex" = "Central Operculum",
+  "Parietal Operculum Cortex" = "Parietal Operculum",
+  "Intracalcarine Cortex" = "Intracalcarine",
+  "Frontal Medial Cortex" = "Frontal Medial",
+  "Subcallosal Cortex" = "Subcallosal",
+  "Cuneal Cortex" = "Cuneus",
+  "Supracalcarine Cortex" = "Supracalcarine",
+  "Heschls Gyrus (includes H1 and H2)" = "Heschl's Gyrus",
+  "Insular Cortex" = "Insula",
+  "Paracingulate Gyrus" = "Paracingulate",
+)
+
+# renaming and removing columns 
+colnames(vbm1) <- c("index", "IC", "direction", "modality", "hemisphere", "atlas", "overlap_pct")
+vbm_1 <- vbm1[vbm1$IC == "IC00", ]
+vbm_1 <- merge(vbm_1, labels, by.x = "index", by.y = "New Index")
+vbm_1 <- vbm_1[,-2]
+vbm_1 <- vbm_1[vbm_1$overlap_pct != 0, ]
+vbm_1 <- vbm_1 [order(vbm_1$overlap_pct, decreasing = TRUE),]
+
+colnames(vbm_1) 
+vbm_1 <- vbm_1[, c(7, 2, 3, 4, 6, 5,1)]
+colnames(vbm_1) <-  c("StructName", "direction", "modality", "hemisphere", "overlap_pct", "atlas", "index")  
+colnames(vbm_1)
+
+# JD 
+jd1 <- read.table('/Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer/Output/Flica_Output/ABIDE/iterations1500/FSL_format/150ica_secondfilter/JD_R/Overlap_percentages_IC1.txt',
+                 sep = "=",
+                 header = FALSE,
+                 strip.white = TRUE,
+                 fill = TRUE)
+
+labels <- readxl::read_xlsx('/Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer/HOA/HarvardOxford_Atlas_NewIndex_YCG.xlsx')
+
+which(colnames(labels) == "HOA Index")
+labels <- labels[,-3]
+which(colnames(labels) == "Hemisphere")
+labels <- labels[,-4]
+which(colnames(labels) == "Order")
+labels <- labels[,-1]
+
+# renaming labels 
+labels$Nomenclature <- dplyr::recode(labels$Nomenclature,
+  "Juxtapositional Lobule Cortex (formerly Supplementary Motor Cortex)" = "Juxtapositional Lobule Cortex",
+  "Superior Frontal Gyrus" = "SFG",
+  "Middle Frontal Gyrus" = "MFG",
+  "Inferior Frontal Gyrus, pars triangularis" = "IFG, pars triangularis",
+  "Inferior Frontal Gyrus, pars opercularis" = "IFG, pars opercularis",
+  "Superior Temporal Gyrus, anterior division" = "STG, anterior",
+  "Superior Temporal Gyrus, posterior division" = "STG, posterior",
+  "Middle Temporal Gyrus, anterior division" = "MTG, anterior",
+  "Middle Temporal Gyrus, posterior division" = "MTG, posterior",
+  "Middle Temporal Gyrus, temporooccipital part" = "MTG, temporo-occipital",
+  "Inferior Temporal Gyrus, anterior division" = "ITG, anterior",
+  "Inferior Temporal Gyrus, posterior division" = "ITG, posterior",
+  "Inferior Temporal Gyrus, temporooccipital part" = "ITG, temporo-occipital",
+  "Superior Parietal Lobule" = "SPL",
+  "Supramarginal Gyrus, anterior division" = "SMG, anterior",
+  "Supramarginal Gyrus, posterior division" = "SMG, posterior",
+  "Lateral Occipital Cortex, superior division" = "LOC, superior",
+  "Lateral Occipital Cortex, inferior division" = "LOC, inferior",
+  "Cingulate Gyrus, anterior division" = "ACC",
+  "Cingulate Gyrus, posterior division" = "PCC",
+  "Precuneous Cortex" = "Precuneus",
+  "Parahippocampal Gyrus, anterior division" = "PHG, anterior",
+  "Parahippocampal Gyrus, posterior division" = "PHG, posterior",
+  "Temporal Fusiform Cortex, anterior division" = "Fusiform, anterior",
+  "Temporal Fusiform Cortex, posterior division" = "Fusiform, posterior",
+  "Temporal Occipital Fusiform Cortex" = "Temporo-occipital Fusiform",
+  "Occipital Fusiform Gyrus" = "Occipital Fusiform",
+  "Frontal Orbital Cortex" = "Frontal Orbital",
+  "Frontal Operculum Cortex" = "Frontal Operculum",
+  "Central Opercular Cortex" = "Central Operculum",
+  "Parietal Operculum Cortex" = "Parietal Operculum",
+  "Intracalcarine Cortex" = "Intracalcarine",
+  "Frontal Medial Cortex" = "Frontal Medial",
+  "Subcallosal Cortex" = "Subcallosal",
+  "Cuneal Cortex" = "Cuneus",
+  "Supracalcarine Cortex" = "Supracalcarine",
+  "Heschls Gyrus (includes H1 and H2)" = "Heschl's Gyrus",
+  "Insular Cortex" = "Insula",
+  "Paracingulate Gyrus" = "Paracingulate",
+)
+
+#renaming and removing columns
+colnames(jd1) <- c("index", "IC", "direction", "modality", "hemisphere", "atlas", "overlap_pct")
+jd_1 <- jd1[jd1$IC == "IC00", ]
+jd_1 <- merge(jd_1, labels, by.x = "index", by.y = "New Index")
+jd_1 <- jd_1[jd_1$overlap_pct != 0, ]
+jd_1 <- jd_1 [order(jd_1$overlap_pct, decreasing = TRUE),]
+jd_1 <- jd_1[,-2]
+
+
+colnames(jd_1) 
+jd_1 <- jd_1[, c(7, 2, 3, 4,6,5,1)]
+colnames(jd_1) <-  c("StructName", "direction", "modality", "hemisphere", "overlap_pct", "atlas", "index")  
+colnames(jd_1)
+```
+
+## Destrieux
+```{r}
+#Cortical Thickness
+ct1 <- read.table('/Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer/Output/Flica_Output/ABIDE/iterations1500/FSL_format/150ica_secondfilter/CT_R/Overlap_percentages_bin_surface01.txt', comment.char = "#")
+
+pa1 <- read.table('/Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer/Output/Flica_Output/ABIDE/iterations1500/FSL_format/150ica_secondfilter/PA_R/Overlap_percentages_bin_surface01.txt', comment.char = "#")
+
+ct1 <- ct1[,-2]
+ct1 <- ct1[,-3]
+ct1 <- ct1[,-4]
+ct1 <- ct1[,-5]
+ct1 <- ct1[,-6]
+ct1 <- ct1[,-2]#remove IC because we only have one
+
+
+colnames(ct1) <- c("StructName", "direction", "modality","hemisphere", "overlap_pct")  
+ct1 <- ct1 [order(ct1$overlap_pct, decreasing = TRUE),]
+
+#renaming and removing columns
+ct1$StructName <- dplyr::recode(ct1$StructName,
+  "G_front_sup" = "Superior Frontal",
+  "S_central" = "Central Sulcus",
+  "G_parietal_sup" = "Superior Parietal",
+  "G_precuneus" = "Precuneus",
+  "S_orbital-H_Shaped" = "H-shaped Orbital Sulcus",
+  "G_precentral" = "Precentral",
+  "G_pariet_inf-Supramar" = "Supramarginal",
+  "G_and_S_cingul-Ant" = "Anterior Cingulate",
+  "G_occipital_sup" = "Superior Occipital",
+  "G_and_S_paracentral" = "Paracentral",
+  "S_circular_insula_inf" = "Inferior Circular Insula",
+  "S_front_inf" = "Inferior Frontal Sulcus",
+  "G_Ins_lg_and_S_cent_ins" = "Long Insular Gyrus",
+  "G_temporal_middle" = "Middle Temporal",
+  "S_cingul-Marginalis" = "Marginal Cingulate Sulcus",
+  "S_intrapariet_and_P_trans" = "Intraparietal Sulcus",
+  "G_front_middle" = "Middle Frontal",
+  "S_postcentral" = "Postcentral Sulcus",
+  "G_oc-temp_med-Parahip" = "Parahippocampal",
+  "Pole_temporal" = "Temporal Pole",
+  "S_orbital_med-olfact" = "Medial Orbital Sulcus",
+  "G_temporal_inf" = "Inferior Temporal",
+  "S_circular_insula_sup" = "Superior Circular Insula",
+  "G_and_S_subcentral" = "Subcentral",
+  "G_insular_short" = "Short Insular Gyrus",
+  "S_temporal_inf" = "Inferior Temporal Sulcus",
+  "G_orbital" = "Orbital Gyrus",
+  "S_precentral-inf-part" = "Inferior Precentral Sulcus",
+  "S_calcarine" = "Calcarine Sulcus",
+  "G_cingul-Post-ventral" = "Ventral Posterior Cingulate",
+  "G_postcentral" = "Postcentral",
+  "S_subparietal" = "Subparietal Sulcus",
+  "G_cuneus" = "Cuneus",
+  "S_front_sup" = "Superior Frontal Sulcus",
+  "S_pericallosal" = "Pericallosal Sulcus",
+  "G_temp_sup-Plan_tempo" = "Planum Temporale",
+  "Lat_Fis-post" = "Posterior Lateral Fissure",
+  "S_precentral-sup-part" = "Superior Precentral Sulcus",
+  "S_temporal_sup" = "Superior Temporal Sulcus",
+  "G_pariet_inf-Angular" = "Angular Gyrus",
+  "G_oc-temp_lat-fusifor" = "Fusiform",
+  "S_oc_sup_and_transversal" = "Superior Occipital Sulcus",
+  "G_subcallosal" = "Subcallosal",
+  "G_cingul-Post-dorsal" = "Dorsal Posterior Cingulate",
+  "G_and_S_cingul-Mid-Post" = "Mid-Posterior Cingulate",
+  "G_occipital_middle" = "Middle Occipital",
+  "G_temp_sup-Plan_polar" = "Planum Polare",
+  "Lat_Fis-ant-Vertical" = "Anterior Lateral Fissure",
+  "G_front_inf-Triangul" = "Inferior Frontal, pars triangularis",
+  "S_front_middle" = "Middle Frontal Sulcus",
+  "G_rectus" = "Gyrus Rectus",
+  "S_oc-temp_lat" = "Occipitotemporal Sulcus",
+  "G_temp_sup-Lateral" = "Lateral Superior Temporal",
+  "S_parieto_occipital" = "Parieto-occipital Sulcus",
+  "S_suborbital" = "Suborbital Sulcus",
+  "S_orbital_lateral" = "Lateral Orbital Sulcus",
+  "Lat_Fis-ant-Horizont" = "Anterior Horizontal Fissure",
+  "S_collat_transv_ant" = "Anterior Transverse Collateral Sulcus",
+  "S_temporal_transverse" = "Transverse Temporal Sulcus",
+  "G_oc-temp_med-Lingual" = "Lingual Gyrus",
+  "S_oc-temp_med_and_Lingual" = "Collateral Sulcus",
+  "G_and_S_cingul-Mid-Ant" = "Anterior Midcingulate Cortex",
+  "G_and_S_occipital_inf" = "Inferior Occipital Gyrus and Sulcus",
+  "G_temp_sup-G_T_transv" = "Transverse Temporal Gyrus (Heschl's Gyrus)",
+  "S_oc_middle_and_Lunatus" = "Middle Occipital and Lunate Sulcus",
+  "G_front_inf-Opercular" = "Inferior Frontal Gyrus, pars opercularis",
+  "S_occipital_ant" = "Anterior Occipital Sulcus",
+  "G_and_S_frontomargin" = "Frontomarginal Gyrus and Sulcus"
+)
+
+# Pial Area 
+pa1 <- pa1[,-2]
+pa1 <- pa1[,-3]
+pa1 <- pa1[,-4]
+pa1 <- pa1[,-5]
+pa1 <- pa1[,-6]
+pa1 <- pa1[,-2]#remove IC because we only have one
+
+
+colnames(pa1) <- c("StructName", "direction", "modality","hemisphere", "overlap_pct")  
+pa1 <- pa1 [order(pa1$overlap_pct, decreasing = TRUE),]
+
+#renaming lables
+pa1$StructName <- dplyr::recode(pa1$StructName,
+  "G_front_sup" = "Superior Frontal",
+  "S_central" = "Central Sulcus",
+  "G_parietal_sup" = "Superior Parietal",
+  "G_precuneus" = "Precuneus",
+  "S_orbital-H_Shaped" = "H-shaped Orbital Sulcus",
+  "G_precentral" = "Precentral",
+  "G_pariet_inf-Supramar" = "Supramarginal",
+  "G_and_S_cingul-Ant" = "Anterior Cingulate",
+  "G_occipital_sup" = "Superior Occipital",
+  "G_and_S_paracentral" = "Paracentral",
+  "S_circular_insula_inf" = "Inferior Circular Insula",
+  "S_front_inf" = "Inferior Frontal Sulcus",
+  "G_Ins_lg_and_S_cent_ins" = "Long Insular Gyrus",
+  "G_temporal_middle" = "Middle Temporal",
+  "S_cingul-Marginalis" = "Marginal Cingulate Sulcus",
+  "S_intrapariet_and_P_trans" = "Intraparietal Sulcus",
+  "G_front_middle" = "Middle Frontal",
+  "S_postcentral" = "Postcentral Sulcus",
+  "G_oc-temp_med-Parahip" = "Parahippocampal",
+  "Pole_temporal" = "Temporal Pole",
+  "S_orbital_med-olfact" = "Medial Orbital Sulcus",
+  "G_temporal_inf" = "Inferior Temporal",
+  "S_circular_insula_sup" = "Superior Circular Insula",
+  "G_and_S_subcentral" = "Subcentral",
+  "G_insular_short" = "Short Insular Gyrus",
+  "S_temporal_inf" = "Inferior Temporal Sulcus",
+  "G_orbital" = "Orbital Gyrus",
+  "S_precentral-inf-part" = "Inferior Precentral Sulcus",
+  "S_calcarine" = "Calcarine Sulcus",
+  "G_cingul-Post-ventral" = "Ventral Posterior Cingulate",
+  "G_postcentral" = "Postcentral",
+  "S_subparietal" = "Subparietal Sulcus",
+  "G_cuneus" = "Cuneus",
+  "S_front_sup" = "Superior Frontal Sulcus",
+  "S_pericallosal" = "Pericallosal Sulcus",
+  "G_temp_sup-Plan_tempo" = "Planum Temporale",
+  "Lat_Fis-post" = "Posterior Lateral Fissure",
+  "S_precentral-sup-part" = "Superior Precentral Sulcus",
+  "S_temporal_sup" = "Superior Temporal Sulcus",
+  "G_pariet_inf-Angular" = "Angular Gyrus",
+  "G_oc-temp_lat-fusifor" = "Fusiform",
+  "S_oc_sup_and_transversal" = "Superior Occipital Sulcus",
+  "G_subcallosal" = "Subcallosal",
+  "G_cingul-Post-dorsal" = "Dorsal Posterior Cingulate",
+  "G_and_S_cingul-Mid-Post" = "Mid-Posterior Cingulate",
+  "G_occipital_middle" = "Middle Occipital",
+  "G_temp_sup-Plan_polar" = "Superior Temporal Gyrus, Planum Polare",
+  "Lat_Fis-ant-Vertical" = "Anterior Lateral Fissure",
+  "G_front_inf-Triangul" = "Inferior Frontal, pars Triangularis",
+  "S_front_middle" = "Middle Frontal Sulcus",
+  "G_rectus" = "Gyrus Rectus",
+  "S_oc-temp_lat" = "Occipitotemporal Sulcus",
+  "G_temp_sup-Lateral" = "Lateral Superior Temporal",
+  "S_parieto_occipital" = "Parieto-occipital Sulcus",
+  "S_suborbital" = "Suborbital Sulcus",
+  "S_orbital_lateral" = "Lateral Orbital Sulcus",
+  "Lat_Fis-ant-Horizont" = "Anterior Horizontal Fissure",
+  "S_collat_transv_ant" = "Anterior Transverse Collateral Sulcus",
+  "S_temporal_transverse" = "Transverse Temporal Sulcus",
+  "G_oc-temp_med-Lingual" = "Lingual Gyrus",
+  "S_oc-temp_med_and_Lingual" = "Medial Occipito-Temporal sulcus",
+  "G_and_S_cingul-Mid-Ant" = "Anterior Midcingulate Cortex",
+  "G_and_S_occipital_inf" = "Inferior Occipital Gyrus and Sulcus",
+  "G_temp_sup-G_T_transv" = "Transverse Temporal Gyrus (Heschl's Gyrus)",
+  "S_oc_middle_and_Lunatus" = "Middle Occipital and Lunate Sulcus",
+  "G_front_inf-Opercular" = "Inferior Frontal Gyrus, pars opercularis",
+  "G_and_S_transv_frontopol" = "Transverse Frontopolar Gyri and Sulci",
+  "G_and_S_frontomargin" = "Frontomarginal Gyrus and Sulcus",
+  "S_occipital_ant" = "Anterior Occipital Sulcus"
+)
+
+vol_data_1 <- rbind(vbm_1, jd_1)
+surf_data_1 <- rbind(ct1, pa1)
+
+surf_data_1$hemisphere <- ifelse(surf_data_1$hemisphere == "lh", "L", "R")
+
+
+# write.csv(vol_data_1, '/Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer/Output/Plots/vol_data_IC1.csv', row.names = FALSE)
+# write.csv(surf_data_1, '/Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer/Output/Plots/surf_data_IC1.csv', row.names = FALSE)
+```
+
+# Plots
+## IC37
+```{r}
+
+subcort <- c("Thalamus", "Caudate", "Putamen", "Pallidum",
+             "Hippocampus", "Amygdala", "Accumbens", "Brain-Stem")
+
+set2_cols <- brewer.pal(4, "Set2")
+
+small_theme <- theme_minimal(base_size = 7) +
+  theme(
+    axis.text.y        = element_text(size = 6.5),
+    axis.text.x        = element_text(size = 6),
+    panel.grid.minor   = element_blank(),
+    panel.grid.major.y = element_blank(),
+    plot.title         = element_text(size = 7, face = "bold"),
+    plot.subtitle      = element_text(size = 6.5),
+    legend.title       = element_text(size = 7),
+    legend.text        = element_text(size = 6.5),
+    legend.key.size    = unit(3, "mm")
+  )
+
+vol_fill  <- scale_fill_manual(values = c(jd = set2_cols[1], vbm = set2_cols[2]),
+                               limits = c("jd", "vbm"), labels = c("JD", "VBM"),
+                               name = "Modality", drop = FALSE)
+surf_fill <- scale_fill_manual(values = c(ct = set2_cols[3], pa = set2_cols[4]),
+                               limits = c("ct", "pa"), labels = c("CT", "SA"),
+                               name = "Modality", drop = FALSE)
+
+
+shorten <- function(x) {
+  dplyr::recode(x,
+    "Juxtapositional Lobule Cortex" = "SMA",
+    "Postcentral Gyrus"             = "PoCG",
+    "Precentral Gyrus"              = "PreCG",
+    "Occipital Fusiform"            = "Occipital FFG",
+    "Fusiform, posterior"           = "FFG, posterior",
+    "Temporo-occipital Fusiform"    = "Temporo-occipital FFG",
+    "Angular Gyrus"                 = "AG",
+    "Lingual Gyrus"                 = "LG",
+    "Superior Frontal"              = "SFG",
+    "Superior Frontal Sulcus"       = "SFS",
+    "Middle Frontal"                = "MFG",
+    "Middle Frontal Sulcus"         = "MFS",
+    "Inferior Frontal Sulcus"       = "IFS",
+    "Inferior Temporal"             = "ITG",
+    "Middle Temporal"               = "MTG",
+    "Lateral Superior Temporal"     = "STG, lateral",
+    "Superior Temporal Sulcus"      = "STS",
+    "Transverse Temporal Sulcus"    = "Transverse temporal S.",
+    "Superior Parietal"             = "SPL",
+    "Supramarginal"                 = "SMG",
+    "Superior Occipital"            = "SOG",
+    "Superior Occipital Sulcus"     = "SOS",
+    "Inferior Occipital Gyrus and Sulcus" = "IOG and S.",
+    "Anterior Cingulate"            = "ACC",
+    "Marginal Cingulate Sulcus"     = "Marginal cing. S.",
+    "Pericallosal Sulcus"           = "Pericallosal S.",
+    "Central Sulcus"                = "CS",
+    "Precentral"                    = "PreCG",
+    "Postcentral"                   = "PoCG",
+    "Paracentral"                   = "PCL",
+    "Parahippocampal"               = "PHG",
+    "Calcarine Sulcus"              = "Calcarine S.",
+    "Collateral Sulcus"             = "Collateral S.",
+    "Suborbital Sulcus"             = "Suborbital S.",
+    "H-shaped Orbital Sulcus"       = "H-shaped orbital S.",
+    "Orbital Gyrus"                 = "Orbital gyrus",
+    "Inferior Circular Insula"      = "Inf. circular insula",
+    "Superior Circular Insula"      = "Sup. circular insula",
+    "Long Insular Gyrus"            = "Long insular gyrus",
+    "Short Insular Gyrus"           = "Short insular gyrus"
+  )
+}
+
+
+make_bar <- function(df, hemi, dir, ttl, sub, fill_scale, n_top = 8) {
+  d <- df[df$hemisphere == hemi & df$direction == dir, ]
+  d$StructName <- shorten(as.character(d$StructName))
+  top <- d %>% group_by(StructName) %>% summarise(tot = sum(overlap_pct)) %>%
+    slice_max(tot, n = n_top, with_ties = FALSE)
+  d <- d %>% filter(StructName %in% top$StructName) %>%
+    mutate(StructName = factor(StructName, levels = rev(top$StructName)))
+  ggplot(d, aes(x = StructName, y = overlap_pct, fill = modality)) +
+    geom_col(width = 0.75, show.legend = TRUE) + coord_flip() +
+    scale_y_continuous(n.breaks = 4) +
+    fill_scale + small_theme +
+    labs(title = ttl, subtitle = sub, x = NULL, y = "Overlap (%)")
+}
+
+
+vol_cort_all <- vol_data %>% filter(!StructName %in% subcort)
+
+p1 <- make_bar(vol_cort_all, "L", "pos", "Left hemisphere",  "NAI > autism", vol_fill)
+p2 <- make_bar(vol_cort_all, "R", "pos", "Right hemisphere", "NAI > autism", vol_fill)
+p3 <- make_bar(vol_cort_all, "L", "neg", NULL,               "Autism > NAI", vol_fill)
+p4 <- make_bar(vol_cort_all, "R", "neg", NULL,               "Autism > NAI", vol_fill)
+
+p5 <- make_bar(surf_data, "L", "pos", "Left hemisphere",  "NAI > autism", surf_fill)
+p6 <- make_bar(surf_data, "R", "pos", "Right hemisphere", "NAI > autism", surf_fill)
+p7 <- make_bar(surf_data, "L", "neg", NULL,               "Autism > NAI", surf_fill)
+p8 <- make_bar(surf_data, "R", "neg", NULL,               "Autism > NAI", surf_fill)
+
+pb <- (p1 + p2) / (p3 + p4) + plot_layout(guides = "collect") & theme(legend.position = "bottom")
+pc <- (p5 + p6) / (p7 + p8) + plot_layout(guides = "collect") & theme(legend.position = "bottom")
+
+# ggsave('/Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer/Output/Plots/modality_overlap_panel_b.pdf',
+#        pb, width = 11.5, height = 7.5, units = "cm")
+# ggsave('/Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer/Output/Plots/modality_overlap_panel_c.pdf',
+#         pc, width = 11.5, height = 7.5, units = "cm")
+
+# One fill scale for all four modalities (same colours as panel a)
+all_fill <- scale_fill_manual(
+  values = c(vbm = set2_cols[2], jd = set2_cols[1], ct = set2_cols[3], pa = set2_cols[4]),
+  limits = c("vbm", "jd", "ct", "pa"),
+  labels = c("VBM", "JD", "CT", "SA"),
+  name = "Modality", drop = FALSE)
+
+# Combine volumetric (cortical only) and surface data
+all_data <- bind_rows(vol_cort_all, surf_data)
+
+p1 <- make_bar(all_data, "L", "pos", "Left hemisphere",  "NAI > autism", all_fill, n_top = 10)
+p2 <- make_bar(all_data, "R", "pos", "Right hemisphere", "NAI > autism", all_fill, n_top = 10)
+p3 <- make_bar(all_data, "L", "neg", NULL,               "Autism > NAI", all_fill, n_top = 10)
+p4 <- make_bar(all_data, "R", "neg", NULL,               "Autism > NAI", all_fill, n_top = 10)
+
+p_all <- (p1 + p2) / (p3 + p4) +
+  plot_layout(guides = "collect") & theme(legend.position = "bottom")
+p_all
+
+ggsave('/Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer/Output/Plots/modality_overlap_combined.pdf',
+       p_all, width = 11.5, height = 15, units = "cm")
+
+
+make_bar_v <- function(df, hemi, dir, ttl, sub, fill_scale, n_top = 10) {
+  d <- df[df$hemisphere == hemi & df$direction == dir, ]
+  d$StructName <- shorten(as.character(d$StructName))
+  top <- d %>% group_by(StructName) %>% summarise(tot = sum(overlap_pct)) %>%
+    slice_max(tot, n = n_top, with_ties = FALSE)
+  d <- d %>% filter(StructName %in% top$StructName) %>%
+    mutate(StructName = factor(StructName, levels = top$StructName))   # largest on the left
+  ggplot(d, aes(x = StructName, y = overlap_pct, fill = modality)) +
+    geom_col(width = 0.75, show.legend = TRUE) +
+    scale_y_continuous(n.breaks = 4, expand = expansion(mult = c(0, 0.05))) +
+    fill_scale + small_theme +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1),
+          panel.grid.major.x = element_blank(),
+          panel.grid.major.y = element_line()) +
+    labs(title = ttl, subtitle = sub, x = NULL, y = "Overlap (%)")
+}
+
+p1 <- make_bar_v(all_data, "L", "pos", "Left hemisphere",  "NAI > autism", all_fill)
+p2 <- make_bar_v(all_data, "R", "pos", "Right hemisphere", "NAI > autism", all_fill)
+p3 <- make_bar_v(all_data, "L", "neg", NULL,               "Autism > NAI", all_fill)
+p4 <- make_bar_v(all_data, "R", "neg", NULL,               "Autism > NAI", all_fill)
+
+p_all <- (p1 + p2) / (p3 + p4) +
+  plot_layout(guides = "collect") & theme(legend.position = "bottom")
+
+ggsave('/Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer/Output/Plots/modality_overlap_combined_rotated.pdf',
+       p_all, width = 11.5, height = 15, units = "cm")
+```
+
+## IC 1
+```{r}
+# cortical volume data for IC1 (top regions are selected per panel)
+vol_cort_all_1 <- vol_data_1 %>% filter(!StructName %in% subcort)
+
+# Panel b: VBM/JD positive only (IC1 has almost no negative volumetric overlap)
+p9  <- make_bar(vol_cort_all_1, "L", "pos", "Left hemisphere",  "Higher ADOS", vol_fill)
+p10 <- make_bar(vol_cort_all_1, "R", "pos", "Right hemisphere", "Higher ADOS", vol_fill)
+
+# Panel c: CT/PA both directions
+p13 <- make_bar(surf_data_1, "L", "pos", "Left hemisphere",  "Higher ADOS", surf_fill)
+p14 <- make_bar(surf_data_1, "R", "pos", "Right hemisphere", "Higher ADOS", surf_fill)
+p15 <- make_bar(surf_data_1, "L", "neg", NULL,               "Lower ADOS",  surf_fill)
+p16 <- make_bar(surf_data_1, "R", "neg", NULL,               "Lower ADOS",  surf_fill)
+
+pb1 <- (p9 + p10) + plot_layout(guides = "collect") & theme(legend.position = "bottom")
+pc1 <- (p13 + p14) / (p15 + p16) + plot_layout(guides = "collect") & theme(legend.position = "bottom")
+
+ggsave('/Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer/Output/Plots/modality_IC1_panel_b.pdf',
+       pb1, width = 11.5, height = 4.5, units = "cm")
+ggsave('/Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer/Output/Plots/modality_IC1_panel_c.pdf',
+       pc1, width = 11.5, height = 7.5, units = "cm")
+
+
+
+vol_cort_all_1 <- vol_data_1 %>% filter(!StructName %in% subcort)
+all_data_1     <- bind_rows(vol_cort_all_1, surf_data_1)
+
+q1 <- make_bar_v(all_data_1, "L", "pos", "Left hemisphere",  "Higher ADOS", all_fill)
+q2 <- make_bar_v(all_data_1, "R", "pos", "Right hemisphere", "Higher ADOS", all_fill)
+q3 <- make_bar_v(all_data_1, "L", "neg", NULL,               "Lower ADOS",  all_fill)
+q4 <- make_bar_v(all_data_1, "R", "neg", NULL,               "Lower ADOS",  all_fill)
+
+p_all_1 <- (q1 + q2) / (q3 + q4) +
+  plot_layout(guides = "collect") & theme(legend.position = "bottom")
+p_all_1
+
+ggsave('/Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer/Output/Plots/modality_IC1_combined.pdf',
+       p_all_1, width = 11.5, height = 10, units = "cm")
+
+
+
+```
+
+# supplementary tables
+```{r}
+base <- '/Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer/Output/Plots/'
+vol37  <- read.csv(paste0(base, 'vol_data_IC37.csv'))
+surf37 <- read.csv(paste0(base, 'surf_data_IC37.csv'))
+vol1   <- read.csv(paste0(base, 'vol_data_IC1.csv'))
+surf1  <- read.csv(paste0(base, 'surf_data_IC1.csv'))
+
+
+make_wide <- function(df) {
+  df %>%
+    mutate(Modality   = recode(toupper(modality), "PA" = "SA"),   # surface area (white surface)
+           key        = paste(direction, Modality, sep = "_"),
+           StructName = recode(StructName, "Brain-Stem" = "Brainstem"),
+           hemisphere = ifelse(hemisphere %in% c("lh", "L"), "L", "R")) %>%
+    group_by(StructName, hemisphere, key) %>%
+    summarise(overlap = sum(overlap_pct), .groups = "drop") %>%
+    pivot_wider(names_from = key, values_from = overlap)
+}
+
+
+make_ft <- function(wide, dir_labels, mods) {
+  cols <- c(); spans <- c(); spanlab <- c()
+  for (d in names(dir_labels)) {
+    present <- intersect(paste(d, mods, sep = "_"), names(wide))
+    if (length(present) > 0) {
+      cols <- c(cols, present); spans <- c(spans, length(present))
+      spanlab <- c(spanlab, dir_labels[[d]])
+    }
+  }
+  wide <- wide[, c("StructName", "hemisphere", cols)]
+  # sort by largest overlap in any column
+  wide$max <- apply(wide[, cols, drop = FALSE], 1, max, na.rm = TRUE)
+  wide <- wide %>% arrange(desc(max)) %>% select(-max)
+  wide <- wide %>%
+    mutate(across(all_of(cols), ~ ifelse(is.na(.x), "–", formatC(.x, format = "f", digits = 2))))
+
+  hdr <- setNames(as.list(c("Region", "Hemisphere", sub("^.*_", "", cols))), names(wide))
+
+  flextable(wide) %>%
+    set_header_labels(values = hdr) %>%
+    add_header_row(values = c("", spanlab), colwidths = c(2, spans)) %>%
+    flextable::theme_apa() %>%
+    font(fontname = "Times New Roman", part = "all") %>%
+    fontsize(size = 9, part = "all") %>%
+    align(j = 2:ncol(wide), align = "center", part = "all") %>%
+    align(j = 1, align = "left", part = "all") %>%
+    padding(padding.top = 1, padding.bottom = 1, part = "body") %>%
+    autofit()
+}
+
+
+tnr <- function(...) fp_text(font.family = "Times New Roman", font.size = 12, ...)
+add_tab <- function(doc, num, title, ft, note) {
+  doc %>%
+    body_add_fpar(fpar(ftext(num, tnr(bold = TRUE)))) %>%
+    body_add_fpar(fpar(ftext(title, tnr(italic = TRUE)))) %>%
+    body_add_flextable(ft) %>%
+    body_add_fpar(fpar(ftext("Note. ", tnr(italic = TRUE)), ftext(note, tnr()))) %>%
+    body_add_par("")
+}
+
+dir37 <- c(pos = "NAI > autism", neg = "Autism > NAI")
+dir1  <- c(pos = "Higher ADOS-2", neg = "Lower ADOS-2")
+
+note_vol <- "Values indicate the percentage of suprathreshold voxels (95th percentile of the spatial map, positive and negative loadings separately) falling within each region of the Harvard–Oxford atlas. Dashes indicate no overlap."
+note_sub <- "Values indicate the percentage of suprathreshold voxels (95th percentile of the spatial map, positive and negative loadings separately) falling within each region of the Harvard–Oxford subcortical atlas. Dashes indicate no overlap."
+note_srf <- "Values indicate the percentage of suprathreshold vertices (95th percentile of the spatial map, positive and negative loadings separately) falling within each region of the Destrieux atlas. Dashes indicate no overlap."
+
+tabs <- list(
+  list("Table F1", "Cortical Overlap of IC37 Volumetric Maps (VBM, JD) With the Harvard–Oxford Atlas",
+       make_ft(make_wide(filter(vol37, atlas == "HOC")), dir37, c("VBM", "JD")), note_vol),
+  list("Table F2", "Cortical Overlap of IC37 Surface Maps (CT, SA) With the Destrieux Atlas",
+       make_ft(make_wide(surf37), dir37, c("CT", "SA")), note_srf),
+  list("Table F3", "Subcortical Overlap of IC37 Volumetric Maps (VBM, JD)",
+       make_ft(make_wide(filter(vol37, atlas == "HOS")), dir37, c("VBM", "JD")), note_sub),
+  list("Table F4", "Cortical Overlap of IC1 Volumetric Maps (VBM, JD) With the Harvard–Oxford Atlas",
+       make_ft(make_wide(filter(vol1, atlas == "HOC")), dir1, c("VBM", "JD")), note_vol),
+  list("Table F5", "Cortical Overlap of IC1 Surface Maps (CT, SA) With the Destrieux Atlas",
+       make_ft(make_wide(surf1), dir1, c("CT", "SA")),
+       paste(note_srf, "The contribution of CT to IC1 was negligible (< 1%).")),
+  list("Table F6", "Subcortical Overlap of IC1 Volumetric Maps (VBM, JD)",
+       make_ft(make_wide(filter(vol1, atlas == "HOS")), dir1, c("VBM", "JD")), note_sub)
+)
+
+doc <- read_docx()
+for (t in tabs) doc <- add_tab(doc, t[[1]], t[[2]], t[[3]], t[[4]])
+print(doc, target = paste0(base, 'supp_overlap_tables.docx'))
+```
