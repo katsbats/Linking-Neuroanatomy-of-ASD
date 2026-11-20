@@ -1,0 +1,118 @@
+---
+title: "word cloud"
+author: "Katharina Bremer"
+date: "2026-10-05"
+output: html_document
+---
+
+# Packages
+```{r}
+library(readxl)
+library(ggplot2)
+library(ggwordcloud)
+library(dplyr)
+library(patchwork)
+```
+
+
+# Word Cloud for IC37
+```{r}
+
+dir <- '/Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer/Data/word_cloud/37/'
+
+contrib37 <- c(VBM = 0.433, JD = 0.404, CT = 0.144, PA = 0.019)
+
+terms37pos <- read_excel(paste0(dir, 'ic37pos.xlsx'), sheet = "final")
+terms37neg <- read_excel(paste0(dir, 'ic37neg.xlsx'), sheet = "final")
+colnames(terms37pos) <- c("term", "weight")
+colnames(terms37neg) <- c("term", "weight")
+
+nrow(terms37pos); nrow(terms37neg)    # should both be 40
+head(terms37pos); head(terms37neg)   
+```
+
+```{r}
+set.seed(1)
+terms37pos$angle <- ifelse(nchar(terms37pos$term) <= 8 & runif(nrow(terms37pos)) < 0.4, 90, 0)
+terms37neg$angle <- ifelse(nchar(terms37neg$term) <= 8 & runif(nrow(terms37neg)) < 0.4, 90, 0)
+
+r_min <- min(c(terms37pos$weight, terms37neg$weight))   #weighted r
+r_max <- max(c(terms37pos$weight, terms37neg$weight))   
+
+p37_neg <- ggplot(terms37neg, aes(label = term, size = weight, color = weight, angle = angle)) +   
+  geom_text_wordcloud(rm_outside = TRUE,
+                      eccentricity = 1,
+                      shape = "square",
+                      show.legend = TRUE,
+                      seed = 1) +                                         
+  scale_size_area(max_size = 12, limits = c(r_min, r_max)) +
+  scale_color_viridis_c(limits = c(r_min, r_max), name = "weighted r", trans = "log10") +  
+  guides(size = "none") +
+  theme_void() +
+  theme(legend.position = "right",
+        legend.title = element_text(size = 14),
+        legend.text = element_text(size = 12))
+
+p37_pos <- ggplot(terms37pos, aes(label = term, size = weight, color = weight, angle = angle)) +   # changed
+  geom_text_wordcloud(rm_outside = TRUE,
+                      eccentricity = 1,
+                      shape = "square",
+                      show.legend = TRUE,
+                      seed = 1) +                                          # changed
+  scale_size_area(max_size = 12, limits = c(r_min, r_max)) +
+  scale_color_viridis_c(limits = c(r_min, r_max), name = "weighted r", trans = "log10") +   # changed
+  guides(size = "none") +
+  theme_void() +
+  theme(legend.position = "right",
+        legend.title = element_text(size = 14),
+        legend.text = element_text(size = 12))
+
+
+p37_both <- (p37_pos + ggtitle("NAI > autism")) + (p37_neg + ggtitle("autism > NAI")) +
+  plot_layout(guides = "collect")
+
+ggsave('/Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer/Output/Plots/IC37wordcloud.png',   # changed: new name
+       p37_both, width = 10, height = 6, dpi = 300)
+```
+
+# Word Cloud IC 1
+```{r}
+
+dir <- '/Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer/Data/word_cloud/01/'
+
+contrib1 <- c(VBM = 0.315, JD = 0.53, CT = 0.001, PA = 0.154)
+
+terms1pos <- read_excel(paste0(dir,'ic1_pos.xlsx'), sheet = "final")
+
+colnames(terms1pos) <- c("term", "weight")
+
+nrow(terms1pos)
+head(terms1pos)
+```
+
+```{r}
+set.seed(1)
+terms1pos$angle <- ifelse(nchar(terms1pos$term) <= 8 & runif(nrow(terms1pos)) < 0.4, 90, 0)
+
+r_min <- min(terms1pos$weight)   
+r_max <- max(terms1pos$weight)   
+
+p1_pos <- ggplot(terms1pos, aes(label = term, size = weight, color = weight, angle = angle)) +   
+  geom_text_wordcloud(rm_outside = TRUE,
+                      eccentricity = 1,
+                      shape = "square",
+                      show.legend = TRUE,
+                      seed = 1) +                                                              
+  scale_size_area(max_size = 12, limits = c(r_min, r_max)) +
+  scale_color_viridis_c(limits = c(r_min, r_max), name = "weighted r", trans = "log10") +    
+  guides(size = "none") +
+  ggtitle("IC1: higher ADOS-2 scores") +                                                     
+  theme_void() +
+  theme(legend.position = "right",
+        plot.title = element_text(hjust = 0.5, size = 16),                                   
+        legend.title = element_text(size = 14),
+        legend.text = element_text(size = 12))
+
+ggsave('/Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer/Output/Plots/IC1poswordcloud.png',   
+       p1_pos, width = 7, height = 5, dpi = 300)                                                     
+```

@@ -1,0 +1,60 @@
+---
+title: "Correlation Matrix"
+author: "Katharina Bremer"
+date: "2026-03-30"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+
+library(freesurferformats)
+library(corrplot)
+```
+
+## Nifti files
+```{r}
+vbm <- read.table('/Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer/Data/correlation/means_VBM.txt')$V1
+jd  <- read.table('/Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer/Data/correlation/means_JD.txt')$V1
+ct_lh <- read.fs.mgh('/Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer/Data/brain_data_u30/CT/lh_thickness_all.mgh')
+ct_rh <- read.fs.mgh('/Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer/Data/brain_data_u30/CT/rh_thickness_all.mgh')
+pa_lh <- read.fs.mgh('/Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer/Data/brain_data_u30/PA/lh_area_all.mgh')
+pa_rh <- read.fs.mgh('/Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer/Data/brain_data_u30/PA/rh_area_all.mgh')
+
+
+dim(vbm)
+dim(jd)
+dim(ct_lh)
+dim(ct_rh)
+dim(pa_lh)
+dim(pa_rh)
+
+#remove the unnecessary columns
+pa_lh <- drop(pa_lh)
+pa_rh <- drop(pa_rh)
+ct_lh <- drop(ct_lh)
+ct_rh <- drop(ct_rh)
+
+pa_lh_means <- colMeans(pa_lh) 
+pa_rh_means <- colMeans(pa_rh) 
+ct_lh_means <- colMeans(ct_lh) 
+ct_rh_means <- colMeans(ct_rh) 
+
+ct_means <- (ct_lh_means + ct_rh_means) / 2
+pa_means <- (pa_lh_means + pa_rh_means) / 2
+
+df_means <- data.frame(VBM = vbm, JD = jd, Area = pa_means, Thickness = ct_means)
+dim(df_means)
+
+	
+meanscorr = cor(df_means)
+
+corrplot(meanscorr, method = "color")
+
+png(paste0('/Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer/Output/Plots/correlation_matrix.png'), 
+    width=800, height=800, res=150)
+corr_pos <- meanscorr
+corr_pos[corr_pos < 0] <- 0
+corrplot(corr_pos, method="color", addCoef.col="black", tl.col="black", number.cex=0.8, is.corr=FALSE)
+dev.off()
+```
+

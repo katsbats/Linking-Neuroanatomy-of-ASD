@@ -1,0 +1,133 @@
+---
+title: "IC multimodal plot"
+author: "Katharina Bremer"
+date: "2026-11-02"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(grid)
+library("RColorBrewer")
+library(ggplot2)
+library("ggpubr")
+library(gridGraphics)
+library(dplyr)
+```
+
+```{r }
+data <-  read.csv('/Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer/Output/Flica_Output/ABIDE/iterations1500/FSL_Format/150ica_secondfilter/Modality_contributions.txt', header=FALSE,sep=' ')
+
+
+data_reordered <- data.frame(unlist(data)) #turn into table
+vec_allIC <- unlist(lapply(1:150, function(x) rep(paste0("IC", sprintf("%02d", x)), 4)))
+
+vec_modalities <- rep(c('JD', 'VBM', 'CT', 'PA'), 150)
+
+data_reordered <- data.frame(
+  contribution = unlist(data),
+  contribution_percent = unlist(data) * 100,
+  ICs = vec_allIC,
+  Modalities = vec_modalities
+)
+#Builds the final tidy dataframe 
+
+dim(data)       # 4 x 150
+data[, 37] 
+
+#give us modality contribution percentages
+data_reordered %>%
+  group_by(Modalities) %>%
+  summarise(overall_percent = round(mean(contribution_percent), 1)) %>%
+  arrange(desc(overall_percent))
+
+data_reordered %>%
+  group_by(ICs) %>%
+  slice_max(contribution, n = 1) %>%
+  ungroup() %>%
+  count(Modalities)
+```
+
+# get multimodal matrix 
+```{r}
+data <- as.matrix(data)  # 4x150 matrix
+
+x <- data 
+multimodal <- 0 #initializes the vector
+
+for(i in 1:150){
+  N <- 4
+  score <- max(x[,i]) - (1/N)
+  mx <- 1 - (1/N)
+  MAMI <- 1 - (score / mx)
+  multimodal[i] <- MAMI
+  print(MAMI)
+}
+print(multimodal)
+#For each IC (i) take the maximum modality contribution, subtracts the expected value if all modalities contributed equally (1/4), then normalizes it. Result is 0 = one modality dominates completely, 1 = all modalities contribute equally.
+
+# make multimodal df with MAMI score
+legend_title='Modality'
+IC_labels <- paste0("IC", sprintf("%02d", 1:150))
+multimodal_df <- data.frame(ICs = IC_labels, Multimodal = multimodal)
+
+# rep multimodal index across all ICs (for each 4 modalities per IC)
+multimodal=data.frame(multimodal)
+my_list <- list()
+my_list
+
+n=150*4
+mat <- data.frame(ncol=1, nrow=n)
+for (i in 1:150) {
+  MM <- c(rep(multimodal[i,1],4))
+  MM <- data.frame(MM)
+  my_list[[i]] <- MM  
+}
+MM_rep <-do.call(rbind.data.frame, my_list)
+
+# add multimodal index to data_reordered
+data_reordered$MM_rep <- MM_rep$MM
+
+
+# plot multimodal index modality contributions ordered across all ICs ORDERED
+A <- ggplot(data = data_reordered, aes(x = reorder(ICs, MM_rep), y=contribution_percent, fill = Modalities)) +
+  scale_fill_brewer(palette = "Set2", name = legend_title,
+                  limits = c('JD', 'VBM', 'CT', 'PA'),
+                  labels = c('JD', 'VBM', 'CT', 'SA')) +
+  geom_bar(stat = "identity") + coord_flip() +
+  theme(
+    axis.text.x  = element_text(size = 8),
+    axis.text.y  = element_blank(),        
+    axis.ticks.y = element_blank(),
+    axis.title.x = element_text(size = 10, face = "bold"),
+    axis.title.y = element_text(size = 10, face = "bold"),
+    legend.text  = element_text(size = 8),
+    legend.title = element_text(size = 9, face = "bold"),
+    legend.position = "right"              # was "bottom"
+  ) +
+  labs(y = "% contribution", x = "Independent components (sorted by multimodal index)")
+
+B <- ggplot(data=multimodal_df, aes(x = reorder(ICs, Multimodal), fill= Multimodal)) +
+  scale_fill_gradient(name = "Multimodal index", low = "#FFFFFF", high = "#de2d26", limits = c(0,1), breaks = c(0, 0.5, 1), labels = c("0", "0.5", '1'))+
+  theme(axis.title.x=element_blank(), axis.text.x = element_blank(), axis.ticks = element_blank())+
+  geom_bar() + coord_flip()+
+  theme(
+    legend.position = "right",
+    axis.ticks.y = element_blank(),
+    axis.title.y = element_blank(),
+    axis.text.y = element_blank(),
+    axis.title.x = element_blank(),
+    axis.text.x = element_blank(),
+    legend.text  = element_text(size = 8),
+    legend.title = element_text(size = 9, face = "bold")
+  )
+
+
+library(patchwork)
+final_plot_FSL <- (B + A) +
+  plot_layout(widths = c(1, 3.1), guides = "collect") &
+  theme(legend.position = "right")
+
+ggsave('/Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer/Output/Plots/ICsorted_FSL.jpg',
+       plot = final_plot_FSL, width = 18.5, height = 20, units = "cm", dpi = 300)
+
+```
