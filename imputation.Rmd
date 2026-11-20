@@ -1,0 +1,182 @@
+---
+title: "Imputation"
+author: "Katharina Bremer"
+date: "2026-11-02"
+output: html_document
+---
+
+# Imputation of clinical scores (autistic participants)
+The actual imputation is done with the git_hub package imputation_master, this script does the prep work and analyses the outcome of the imputation. 
+
+
+# Packages
+```{r }
+library(dplyr)
+library(tidyr)
+library(readxl)
+library(ggplot2)
+```
+
+
+## Prepare the data for imputation
+```{r setup, include=FALSE}
+behaviourals_before <- read.csv('/Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer/Scripts/R Studio/data/data_final/FSL_pheno_second_filter_cleaned.csv') %>%
+  filter(DX_GROUP == 1)  # autistic participants only
+
+# Combine the DSM diagnosis columns of ABIDE I (DSM_IV_TR) and ABIDE II (PDD_DSM_IV_TR)
+behaviourals_before <- behaviourals_before %>%
+  mutate(DSM_diagnosis = coalesce(DSM_IV_TR, PDD_DSM_IV_TR)) %>%
+  select(-DSM_IV_TR, -PDD_DSM_IV_TR)
+sum(is.na(behaviourals_before$DSM_diagnosis))
+
+# Drop identifiers, text columns and administrative variables (not used for imputation)
+behaviourals_before <- behaviourals_before %>%
+  select(-all_of(c(
+    'NDAR_GUID', 'dataset', 'MEDICATION_NAME', 'CURRENT_MEDICATION_NAME', 'COMORBIDITY',
+    'NONASD_PSYDX_ICD9CODE', 'FIQ_TEST_TYPE', 'VIQ_TEST_TYPE', 'PIQ_TEST_TYPE',
+    'ADOS_G_CREATIVITY', 'CBCL_1.5.5_STRESS_T', 'BDI_EDITION', 'BDI_TOTAL', 'DX_GROUP',
+    'ASD_DSM_5', 'VINELAND_INFORMANT', 'ADOS_MODULE', 'ADOS_RSRCH_RELIABLE',
+    'ADI_R_RSRCH_RELIABLE', 'SRS_VERSION', 'SRS_EDITION', 'SRS_INFORMANT', 'BRIEF_VERSION',
+    'BRIEF_INFORMANT', 'BRIEF_INCONSISTENCY_SCORE', 'BRIEF_NEGATIVITY_SCORE', 'SCQ_VERSION'
+  )))
+
+# Handedness must be numeric for the imputation.
+behaviourals_before <- behaviourals_before %>%
+  mutate(HANDEDNESS_CATEGORY = as.numeric(HANDEDNESS_CATEGORY))
+
+# Drop variables with > 80 % missing values
+missingness  <- colSums(is.na(behaviourals_before)) / nrow(behaviourals_before) * 100
+vars_to_drop <- names(missingness[missingness > 80])
+behaviourals_before <- behaviourals_before %>% select(-any_of(vars_to_drop))
+
+sort(colSums(is.na(behaviourals_before)) / nrow(behaviourals_before) * 100)
+
+# Drop further questionnaires not used in the analysis (BRIEF, SCQ, CBCL, RBS-R, Vineland, BMI)
+behaviourals_reduced <- behaviourals_before %>%
+  select(-all_of(c(
+    'BRIEF_INHIBIT_T', 'BRIEF_SHIFT_T', 'BRIEF_EMOTIONAL_T', 'BRIEF_BRI_T',
+    'BRIEF_INITIATE_T', 'BRIEF_WORKING_T', 'BRIEF_ORGANIZATION_T', 'BRIEF_PLAN_T',
+    'BRIEF_MONITOR_T', 'BRIEF_MI_T', 'BRIEF_GEC_T', 'SCQ_TOTAL',
+    'CBCL_6.18_ANXIOUS_T', 'CBCL_6.18_WITHDRAWN_T', 'CBCL_6.18_SOMATIC_COMPAINT_T', 'CBCL_6.18_SOCIAL_PROBLEM_T',
+    'CBCL_6.18_THOUGHT_T', 'CBCL_6.18_ATTENTION_T', 'CBCL_6.18_RULE_T', 'CBCL_6.18_AGGRESSIVE_T',
+    'CBCL_6.18_INTERNAL_T', 'CBCL_6.18_EXTERNAL_T', 'CBCL_6.18_TOTAL_PROBLEM_T',
+    'RBSR_6SUBSCALE_STEREOTYPED', 'RBSR_6SUBSCALE_SELF.INJURIOUS', 'RBSR_6SUBSCALE_SAMENESS',
+    'RBSR_6SUBSCALE_RESTRICTED', 'RBSR_6SUBSCALE_COMPULSIVE', 'RBSR_6SUBSCALE_RITUALISTIC', 'RBSR_6SUBSCALE_TOTAL',
+    'VINELAND_RECEPTIVE_V_SCALED', 'VINELAND_EXPRESSIVE_V_SCALED', 'VINELAND_WRITTEN_V_SCALED',
+    'VINELAND_COMMUNICATION_STANDARD', 'VINELAND_PERSONAL_V_SCALED', 'VINELAND_DOMESTIC_V_SCALED',
+    'VINELAND_COMMUNITY_V_SCALED', 'VINELAND_INTERPERSONAL_V_SCALED', 'VINELAND_PLAY_V_SCALED',
+    'VINELAND_COPING_V_SCALED', 'VINELAND_SOCIAL_STANDARD', 'VINELAND_SUM_SCORES', 'BMI'
+  )))
+
+sort(colSums(is.na(behaviourals_reduced)) / nrow(behaviourals_reduced) * 100)  # remaining missingness (%)
+
+# Keep IDs and sites aside; the imputation input contains only the variables
+ids   <- behaviourals_reduced$SUB_ID
+sites <- behaviourals_reduced$SITE_ID
+
+data_for_imputation <- behaviourals_reduced %>% select(-SUB_ID, -SITE_ID)
+data_for_imputation[is.na(data_for_imputation)] <- 999  # missing-value code expected by the imputation toolbox
+
+# write.csv(data_for_imputation, '/Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer/imputation/Imputation-master/data_for_imputation_FSL.csv')
+# write.csv(behaviourals_reduced, '/Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer/Scripts/R Studio/data/data_final/behaviourals_reduced.csv')
+
+
+```
+
+
+## Compare distributions before and after imputation
+
+```{r}
+behaviourals_before <- read.csv('/Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer/Scripts/R Studio/data/data_final/behaviourals_reduced.csv')
+
+reduced_imputed <- read_excel('/Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer/imputation/Imputation-master/Imputation_Output/data_for_imputation_FSL_imputed.xlsx') %>%
+  select(-`...1`)  # row-number column from write.csv
+
+# Add IDs and sites back (same row order as the imputation input)
+stopifnot(nrow(reduced_imputed) == length(ids))
+reduced_imputed <- reduced_imputed %>%
+  mutate(SUB_ID = ids, SITE_ID = sites) %>%
+  select(SUB_ID, SITE_ID, everything())
+
+behaviourals_before$source <- "before"
+reduced_imputed$source     <- "after"
+
+# Helper: long data of the selected variables, before and after imputation
+before_after_long <- function(vars) {
+  bind_rows(
+    behaviourals_before %>% select(all_of(c(vars, "source"))),
+    reduced_imputed     %>% select(all_of(c(vars, "source")))
+  ) %>%
+    pivot_longer(-source, names_to = "variable", values_to = "value")
+}
+
+
+## ADOS and ADI-R (figure for the thesis)
+labels_ados_adi <- c(
+  ADOS_G_total_harmonized        = "ADOS-G Total",
+  ADOS_G_comm_harmonized         = "ADOS-G Communication",
+  ADOS_G_social_harmonized       = "ADOS-G Social",
+  ADOS_G_stereo_behav_harmonized = "ADOS-G Stereotyped Beh.",
+  ADOS_2_total_gotham_harmonized = "ADOS-2 Total",
+  ADOS_2_socaff_harmonized       = "ADOS-2 Social Affect",
+  ADOS_2_rrb_harmonized          = "ADOS-2 RRB",
+  ADOS_2_severity_harmonized     = "ADOS-2 CSS",
+  ADI_R_SOCIAL_TOTAL_A           = "ADI-R Social",
+  ADI_R_VERBAL_TOTAL_BV          = "ADI-R Verbal",
+  ADI_R_NONVERBAL_TOTAL_BV       = "ADI-R Nonverbal",
+  ADI_RRB_harmonized             = "ADI-R RRB"
+)
+
+p_ados_adi <- ggplot(before_after_long(names(labels_ados_adi)), aes(x = value, fill = source, colour = source)) +
+  geom_density(alpha = 0.4, na.rm = TRUE) +
+  facet_wrap(~variable, scales = "free", ncol = 3, labeller = as_labeller(labels_ados_adi)) +
+  scale_fill_manual(values = c("before" = "#E69F00", "after" = "#56B4E9"),
+                    breaks = c("before", "after"),
+                    labels = c("Observed", "After imputation"), name = "Data") +
+  scale_colour_manual(values = c("before" = "#E69F00", "after" = "#56B4E9"),
+                      breaks = c("before", "after"),
+                      labels = c("Observed", "After imputation"), name = "Data") +
+  theme_minimal(base_size = 8) +
+  theme(legend.position  = "bottom",
+        panel.grid.minor = element_blank(),
+        strip.text       = element_text(face = "bold")) +
+  labs(x = NULL, y = "Density")
+
+ggsave('/Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer/Output/Plots/imputation_reduced_ADOS_ADI_FSL_thesis.png',
+       p_ados_adi, width = 16, height = 17, units = "cm", dpi = 300)
+
+```
+
+
+## Sex comparisons of clinical scores after imputation
+```{r wilcoxon-imputed}
+# Imputed clinical data (autistic participants only)
+imputed <- reduced_imputed
+
+clin_vars <- c(
+  "ADI-R Social"             = "ADI_R_SOCIAL_TOTAL_A",
+  "ADI-R Verbal"             = "ADI_R_VERBAL_TOTAL_BV",
+  "ADI-R RRB"                = "ADI_RRB_harmonized",
+  "ADOS-G Total"             = "ADOS_G_total_harmonized",
+  "ADOS-G Communication"     = "ADOS_G_comm_harmonized",
+  "ADOS-G Social"            = "ADOS_G_social_harmonized",
+  "ADOS-2 CSS"               = "ADOS_2_severity_harmonized",
+  "ADOS-2 Social Affect"     = "ADOS_2_socaff_harmonized",
+  "ADOS-2 RRB"               = "ADOS_2_rrb_harmonized",
+  "ADOS-2 Total"             = "ADOS_2_total_gotham_harmonized"
+)
+setdiff(unname(clin_vars), names(imputed))  # sanity check: should return character(0)
+
+# Wilcoxon rank-sum test male vs. female for each measure
+wilcox_imputed <- bind_rows(lapply(names(clin_vars), function(lab) {
+  w <- wilcox.test(as.formula(paste(clin_vars[[lab]], "~ SEX")), data = imputed)
+  data.frame(
+    Measure     = lab,
+    Statistic_W = round(unname(w$statistic), 2),
+    p_value     = signif(w$p.value, 3)
+  )
+}))
+
+wilcox_imputed  # no significant sex differences within the autism group
+
+```
