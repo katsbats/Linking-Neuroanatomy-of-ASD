@@ -1,0 +1,113 @@
+---
+title: "combining more freesurfer data"
+author: "Katharina Bremer"
+date: "2026-03-02"
+output: html_document
+---
+
+# Combining the FreeSurfer output tables
+The FreeSurfer output for ABIDE II was not complete, so I had to add some of the missing sites 
+
+```{r packages}
+library(readr)
+library(dplyr)
+```
+
+## 1) aseg tables: add the U_MIA site
+```{r add-mia-aseg, eval = FALSE}
+# The MIA and USM FreeSurfer outputs were later moved into OutputFreeSurfer/FreeSurferUSM+UM,
+# and their aseg tables to OutputFreeSurfer/ (aseg_volume_tableUM.txt, aseg_volume_USM.csv).
+# The paths below point to these current locations.
+
+mia  <- read_delim('/Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer/Data/OutputFreeSurfer/aseg_volume_tableUM.txt',
+delim = "\t", col_types = cols())
+otherSitesABIDE2 <- read_delim('/Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer/Data/OutputFreeSurfer/ABIDE2/aseg_stats.txt',  delim = "\t", col_types = cols())
+
+# asegstats2table names the first column "Measure:volume" -> rename to SUB_ID in both tables
+mia <- mia %>%
+  rename(SUB_ID = 1) %>%
+  mutate(SUB_ID = sub("^UM_", "", SUB_ID))  # MIA subjects were prefixed "UM_"
+
+otherSitesABIDE2 <- otherSitesABIDE2 %>%
+  rename(SUB_ID = 1) %>%
+  mutate(SUB_ID = as.character(SUB_ID))
+
+# Keep only the columns present in both tables
+common_cols <- intersect(names(otherSitesABIDE2), names(mia))
+
+combined <- bind_rows(
+  otherSitesABIDE2 %>% select(all_of(common_cols)),
+  mia              %>% select(all_of(common_cols))
+)
+
+# Written to the working directory, then moved to Data/OutputFreeSurfer/ABIDE2/
+# write_csv(combined, "aseg_volume_table_ALLSITES_combined.csv")
+```
+
+## 2) aseg tables: add the USM site
+```{r add-usm-aseg, eval = FALSE}
+usm <- read_csv('/Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer/Data/OutputFreeSurfer/aseg_volume_USM.csv')
+otherSitesABIDE2 <- read_csv('/Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer/Data/OutputFreeSurfer/ABIDE2/aseg_volume_table_ALLSITES_combined.csv')  # output of chunk 1
+
+usm <- usm %>%
+  rename(SUB_ID = 1) %>%
+  mutate(SUB_ID = sub("^USM_", "", SUB_ID))
+
+otherSitesABIDE2 <- otherSitesABIDE2 %>%
+  rename(SUB_ID = 1) %>%
+  mutate(SUB_ID = as.character(SUB_ID))
+
+common_cols <- intersect(names(otherSitesABIDE2), names(usm))
+
+combined <- bind_rows(
+  otherSitesABIDE2 %>% select(all_of(common_cols)),
+  usm              %>% select(all_of(common_cols))
+)
+
+# Final ABIDE II aseg table, used in step 4 of the QC script
+# write_csv(combined,"/Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer/Data/OutputFreeSurfer/ABIDE2/aseg_volume_table_ALLSITES_combined_final.csv")
+```
+
+## 3) Stats2Table output for Qoala-T: combine all sites and both datasets
+```{r combine-qoala-input, eval = FALSE}
+ABIDE1 <- read_csv('/Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer/Output/FreeSurfer/FreeSurfer_Output_ABIDE1.csv')
+ABIDE2 <- read_csv('/Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer/Output/FreeSurfer/FreeSurfer_Output_ABIDE2.csv')
+usm    <- read_csv('/Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer/Output/FreeSurfer/FreeSurfer_Output_ABIDE2USM.csv')
+mia    <- read_csv('/Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer/Output/FreeSurfer/FreeSurfer_Output_ABIDE2MIA.csv')
+
+# Harmonise the subject ID column
+ABIDE1 <- ABIDE1 %>% rename(SUB_ID = `...1`) %>% mutate(SUB_ID = as.character(SUB_ID))
+ABIDE2 <- ABIDE2 %>% rename(SUB_ID = `...1`) %>% mutate(SUB_ID = as.character(SUB_ID))
+usm    <- usm    %>% rename(SUB_ID = 1)      %>% mutate(SUB_ID = sub("^USM_", "", SUB_ID))
+mia    <- mia    %>% rename(SUB_ID = 1)      %>% mutate(SUB_ID = sub("^UM_",  "", SUB_ID))
+
+# Keep only the columns present in all ABIDE II tables
+common_cols <- Reduce(intersect, list(colnames(ABIDE2), colnames(usm), colnames(mia)))
+
+ABIDE2_all <- bind_rows(
+  ABIDE2 %>% select(all_of(common_cols)),
+  usm    %>% select(all_of(common_cols)),
+  mia    %>% select(all_of(common_cols))
+)
+
+# sanity check: rows of ABIDE2_all = sum of the three tables
+dim(ABIDE2); dim(usm); dim(mia); dim(ABIDE2_all)
+
+# Exclude the ABIDE II longitudinal subjects (same IDs as in the QC script, step 1)
+exclude_ID_long <- c(50002, 50005, 50006, 50007, 50013, 50026, 50027,
+                     50028, 50029, 50031, 50035, 50038, 50047,
+                     50048, 50049, 50050, 50051)
+
+ABIDE2_all <- ABIDE2_all %>% filter(!SUB_ID %in% exclude_ID_long)
+
+# Combine ABIDE II and ABIDE I
+ABIDE_all <- bind_rows(
+  ABIDE2_all %>% select(all_of(common_cols)),
+  ABIDE1     %>% select(all_of(common_cols))
+)
+
+# write.csv(ABIDE2_all, '/Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer/Output/FreeSurfer/FreeSurfer_Output_ABIDE2_all.csv')
+# write.csv(ABIDE1,     '/Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer/Output/FreeSurfer/FreeSurfer_Output_ABIDE1_final.csv')
+# write.csv(ABIDE_all,  '/Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer/Output/FreeSurfer/FreeSurfer_Output_ABIDE.csv')  # input for Qoala-T (step 5)
+```
+

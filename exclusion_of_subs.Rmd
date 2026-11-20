@@ -1,0 +1,746 @@
+---
+title: "Exclusion of Subjects"
+author: "Katharina Bremer"
+date: "2026-11-02"
+output: html_document
+---
+
+# Packages
+```{r}
+library(readxl)
+library(readr)
+library(ggplot2)
+library(patchwork)
+library(tidyr)
+library(dplyr)
+```
+
+# Loading the phenotypic data
+```{r}
+# -9999 and -999 are ABIDE's codes for missing values -> read them as NA
+ABIDE1_pheno <- read.csv("/Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer/Data/Phenotypic Data/ABIDEIPhenotypic_V1_0b.csv",
+                         header = TRUE, na.strings = c("-9999", "-999"))
+
+ABIDE2_pheno <- read.csv("/Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer/Data/Phenotypic Data/ABIDEIIPhenotypic.csv",
+                         header = TRUE, na.strings = c("-9999", "-999"))
+
+
+
+# Exclude longitudinal data from both datasets
+exclude_ID_long <- c(50002,50005,50006,50007,50013,50026,50027,
+                     50028,50029,50031,50035,50038,50047,
+                     50048,50049,50050,50051) 
+
+ABIDE1_pheno <- ABIDE1_pheno %>% filter(!SUB_ID %in% exclude_ID_long)
+ABIDE2_pheno <- ABIDE2_pheno %>% filter(!SUB_ID %in% exclude_ID_long)
+
+```
+
+# 1) Coverage Check
+```{r}
+
+# Coverage file created with bash: lists subjects with < 90 % whole-brain coverage
+lines <- readLines("/Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer/Data/VBM/coverage_all_90_WholeBrain.txt")
+
+under90 <- grep("has less than 90%", lines, value = TRUE)
+under90  # 14 subjects
+
+# Extract the numeric subject IDs 
+under90_ids <- sub(" has less than 90% coverage", "", under90)
+under90_ids <- as.integer(sub(".*_", "", under90_ids))
+
+sum(ABIDE1_pheno$SUB_ID %in% under90_ids)  # sanity check: should be 14
+
+ABIDE1_pheno <- ABIDE1_pheno[!(ABIDE1_pheno$SUB_ID %in% under90_ids), ]
+
+sum(ABIDE1_pheno$SUB_ID %in% under90_ids)  # sanity check: should be 0
+
+# Combine ABIDE I and II
+# HANDEDNESS_CATEGORY and CURRENT_MED_STATUS have different types in the two datasets
+# (integer vs. character), so convert both to character before binding
+ABIDE1_pheno$HANDEDNESS_CATEGORY <- as.character(ABIDE1_pheno$HANDEDNESS_CATEGORY)
+ABIDE2_pheno$HANDEDNESS_CATEGORY <- as.character(ABIDE2_pheno$HANDEDNESS_CATEGORY)
+
+ABIDE1_pheno$CURRENT_MED_STATUS <- as.character(ABIDE1_pheno$CURRENT_MED_STATUS)
+ABIDE2_pheno$CURRENT_MED_STATUS <- as.character(ABIDE2_pheno$CURRENT_MED_STATUS)
+
+ABIDEall_pheno <- bind_rows(ABIDE1_pheno, ABIDE2_pheno)
+
+nrow(ABIDEall_pheno) == nrow(ABIDE1_pheno) + nrow(ABIDE2_pheno)  # sanity check: should be TRUE
+
+# #saving this step
+# saveRDS(ABIDE1_pheno, '/Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer/Scripts/R Studio/data/ABIDE1_pheno_BC.rds')
+# 
+# saveRDS(ABIDE2_pheno,'/Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer/Scripts/R Studio/data/ABIDE2_pheno_BC.rds')
+# 
+# saveRDS(ABIDEall_pheno, '/Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer/Scripts/R Studio/data/ABIDEall_pheno_BC.rds')
+```
+
+
+# 2) Exclusion based on IQR (CAT12 image quality rating)
+```{r}
+## ABIDE I
+ABIDE1_IQR   <- read.csv('/Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer/Output/IQR/CAT12_IQR_ABIDE1.csv', header = TRUE)  # IQR values extracted from the CAT12 XML files (Matlab)
+ABIDE1_pheno <- readRDS('/Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer/Scripts/R Studio/data/ABIDE1_pheno_BC.rds')  # phenotypic data after step 1
+
+ABIDE1_IQR <- ABIDE1_IQR %>%
+  mutate(SUB_ID = as.integer(as.character(SUB_ID)))
+
+# Subjects in the phenotypic data without an IQR value (no usable CAT12 output)
+missing_ABIDE1 <- setdiff(ABIDE1_pheno$SUB_ID, ABIDE1_IQR$SUB_ID)
+length(missing_ABIDE1)  # 10
+missing_ABIDE1
+
+ABIDE1_pheno %>%
+  filter(SUB_ID %in% missing_ABIDE1) %>%
+  select(SUB_ID, SITE_ID)
+
+# Checked manually: no CAT12 output exists for these subjects (failed segmentation) -> exclude
+failed_corrupt_cat12_ABIDE1 <- c(51232, 51233, 51242, 51243, 51244,
+                                 51245, 51246, 51247, 51270, 51310)
+
+
+ABIDE1_pheno <- ABIDE1_pheno[!ABIDE1_pheno$SUB_ID %in% failed_corrupt_cat12_ABIDE1, ]
+
+sum(ABIDE1_pheno$SUB_ID %in% failed_corrupt_cat12_ABIDE1)  # sanity check: should be 0
+
+
+## ABIDE II
+ABIDE2_IQR   <- read.csv('/Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer/Output/IQR/CAT12_IQR_ABIDE2.csv', header = TRUE)  # IQR values extracted from the CAT12 XML files (Matlab)
+ABIDE2_pheno <- readRDS('/Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer/Scripts/R Studio/data/ABIDE2_pheno_BC.rds')  # phenotypic data after step 1
+
+ABIDE2_IQR <- ABIDE2_IQR %>%
+  mutate(SUB_ID = as.integer(as.character(SUB_ID)))
+
+# IDs that appear in both IQR files = the longitudinal subjects excluded in step 1
+duplicate_ids <- intersect(unique(ABIDE1_IQR$SUB_ID), unique(ABIDE2_IQR$SUB_ID))
+length(duplicate_ids)  # 17
+sort(duplicate_ids)
+
+# Remove them from the ABIDE II IQR table as well (exclude_ID_long defined in step 1)
+ABIDE2_IQR <- ABIDE2_IQR %>%
+  filter(!SUB_ID %in% exclude_ID_long)
+
+# Subjects in the phenotypic data without an IQR value (no CAT12 XML file)
+missing_ABIDE2 <- setdiff(ABIDE2_pheno$SUB_ID, ABIDE2_IQR$SUB_ID)
+missing_ABIDE2  # 3
+
+missing_xml_ABIDE2 <- c(29013, 29895, 29617)
+
+ABIDE2_pheno <- ABIDE2_pheno[!ABIDE2_pheno$SUB_ID %in% missing_xml_ABIDE2, ]
+
+sum(ABIDE2_pheno$SUB_ID %in% missing_xml_ABIDE2)  # sanity check: should be 0
+
+
+## IQR threshold
+# Exclude scans with IQR >= 3 (worse than grade C, "satisfactory")
+
+# ABIDE I
+ABIDE1_IQR_bigger3 <- ABIDE1_IQR %>% filter(IQR >= 3)
+nrow(ABIDE1_IQR_bigger3)  # 33 in the IQR file
+
+hist(ABIDE1_IQR$IQR, breaks = 50)
+abline(v = 3, lwd = 2)
+
+# ABIDE II
+ABIDE2_IQR_bigger3 <- ABIDE2_IQR %>% filter(IQR >= 3)
+nrow(ABIDE2_IQR_bigger3)  # 15 in the IQR file
+
+hist(ABIDE2_IQR$IQR, breaks = 50)
+abline(v = 3, lwd = 2)
+
+# How many of these are still in the phenotypic data
+# (some ABIDE I subjects were already removed in earlier steps)
+ABIDE1_pheno %>% filter(SUB_ID %in% ABIDE1_IQR_bigger3$SUB_ID) %>% nrow()  # 24
+ABIDE2_pheno %>% filter(SUB_ID %in% ABIDE2_IQR_bigger3$SUB_ID) %>% nrow()  # 15
+
+# Remove subjects with IQR >= 3
+ABIDE1_pheno_IQR <- ABIDE1_pheno %>% anti_join(ABIDE1_IQR_bigger3, by = "SUB_ID")
+ABIDE2_pheno_IQR <- ABIDE2_pheno %>% anti_join(ABIDE2_IQR_bigger3, by = "SUB_ID")
+
+sum(ABIDE1_IQR_bigger3$SUB_ID %in% ABIDE1_pheno_IQR$SUB_ID)  # sanity check: should be 0
+sum(ABIDE2_IQR_bigger3$SUB_ID %in% ABIDE2_pheno_IQR$SUB_ID)  # sanity check: should be 0
+
+ABIDEall_pheno_IQR <- bind_rows(ABIDE1_pheno_IQR, ABIDE2_pheno_IQR)
+
+# Saving this step
+# saveRDS(ABIDE1_pheno_IQR, '/Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer/Scripts/R Studio/data/ABIDE1_pheno_IQR.rds')
+# 
+# saveRDS(ABIDE2_pheno_IQR, '/Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer/Scripts/R Studio/data/ABIDE2_pheno_IQR.rds')
+# 
+# saveRDS(ABIDEall_pheno_IQR, '/Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer/Scripts/R Studio/data/ABIDEall_pheno_IQR.rds')
+```
+
+
+
+# 3) Visual exclusion
+After the visual QC, subjects rated as "exclude" are removed from the phenotypic data.
+
+```{r}
+# Phenotypic data after step 2
+ABIDE1_pheno <- readRDS('/Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer/Scripts/R Studio/data/ABIDE1_pheno_IQR.rds')
+ABIDE2_pheno <- readRDS('/Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer/Scripts/R Studio/data/ABIDE2_pheno_IQR.rds')
+
+# Exclusion tables (created manually during visual inspection of the images)
+exclusions_ABIDE1 <- read_excel("/Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer/Quality Control/manual_QC_ABIDE_I_exclusions.xlsx")
+exclusions_ABIDE2 <- read_excel("/Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer/Quality Control/manual_QC_ABIDE_II_exclusions.xlsx")
+
+
+## ABIDE I
+str(exclusions_ABIDE1)
+table(exclusions_ABIDE1$`Exclusion?`, useNA = "ifany")  # all rows are exclusions
+any(duplicated(ABIDE1_pheno$SUB_ID))       # should be FALSE
+any(duplicated(exclusions_ABIDE1$SUB_ID))  # should be FALSE
+
+ABIDE1_pheno_clean <- ABIDE1_pheno[!(ABIDE1_pheno$SUB_ID %in% exclusions_ABIDE1$SUB_ID), ]
+
+# 151 subjects in the exclusion table, 113 of them still in the data
+# (the others were already removed in steps 1-2)
+nrow(ABIDE1_pheno) - nrow(ABIDE1_pheno_clean)  # 113
+
+sum(ABIDE1_pheno_clean$SUB_ID %in% exclusions_ABIDE1$SUB_ID)  # sanity check: should be 0
+
+
+## ABIDE II
+str(exclusions_ABIDE2)
+table(exclusions_ABIDE2$`Exclusion?`, useNA = "ifany")  # all rows are exclusions
+any(duplicated(ABIDE2_pheno$SUB_ID))       # should be FALSE
+any(duplicated(exclusions_ABIDE2$SUB_ID))  # should be FALSE
+
+ABIDE2_pheno_clean <- ABIDE2_pheno[!(ABIDE2_pheno$SUB_ID %in% exclusions_ABIDE2$SUB_ID), ]
+
+# 83 subjects in the exclusion table, 68 of them still in the data
+nrow(ABIDE2_pheno) - nrow(ABIDE2_pheno_clean)  # 68
+
+sum(ABIDE2_pheno_clean$SUB_ID %in% exclusions_ABIDE2$SUB_ID)  # sanity check: should be 0
+
+# Two further subjects with missing CAT12 output files (found during visual QC)
+ABIDE2_pheno_clean <- ABIDE2_pheno_clean %>%
+  filter(!SUB_ID %in% c(29903, 29748))
+
+
+## Combine ABIDE I and II
+ABIDEall_pheno_clean <- bind_rows(ABIDE1_pheno_clean, ABIDE2_pheno_clean)
+
+nrow(ABIDEall_pheno_clean) == nrow(ABIDE1_pheno_clean) + nrow(ABIDE2_pheno_clean)  # sanity check: should be TRUE
+
+#Saving this step
+
+# saveRDS(ABIDE1_pheno_clean,'/Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer/Scripts/R Studio/data/ABIDE1_pheno_after_visualQC.rds')
+# 
+# saveRDS(ABIDE2_pheno_clean,'/Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer/Scripts/R Studio/data/ABIDE2_pheno_after_visualQC.rds')
+# 
+# saveRDS(ABIDEall_pheno_clean,'/Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer/Scripts/R Studio/data/ABIDEall_pheno_after_visualQC.rds')
+```
+
+
+# 4) FreeSurfer errors and MAD threshold on surface holes
+```{r}
+# Phenotypic data after step 3
+ABIDE1_pheno_clean   <- readRDS('/Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer/Scripts/R Studio/data/ABIDE1_pheno_after_visualQC.rds')
+ABIDE2_pheno_clean   <- readRDS('/Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer/Scripts/R Studio/data/ABIDE2_pheno_after_visualQC.rds')
+ABIDEall_pheno_clean <- readRDS('/Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer/Scripts/R Studio/data/ABIDEall_pheno_after_visualQC.rds')
+
+# FreeSurfer aseg output (includes SurfaceHoles)
+aseg_stats_ABIDE1 <- read.delim('/Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer/Data/OutputFreeSurfer/ABIDE1_new/aseg_stats.txt', header = TRUE)
+aseg_stats_ABIDE2 <- read.csv('/Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer/Data/OutputFreeSurfer/ABIDE2/aseg_volume_table_ALLSITES_combined_final.csv', header = TRUE)
+
+colnames(aseg_stats_ABIDE1)[1] <- "SUB_ID"
+colnames(aseg_stats_ABIDE2)[1] <- "SUB_ID"
+
+# Add a dataset column 
+aseg_stats_ABIDE1  <- aseg_stats_ABIDE1  %>% mutate(dataset = "ABIDE1")
+aseg_stats_ABIDE2  <- aseg_stats_ABIDE2  %>% mutate(dataset = "ABIDE2")
+ABIDE1_pheno_clean <- ABIDE1_pheno_clean %>% mutate(dataset = "ABIDE1")
+ABIDE2_pheno_clean <- ABIDE2_pheno_clean %>% mutate(dataset = "ABIDE2")
+
+colnames(aseg_stats_ABIDE1)[1] <- "SUB_ID"
+colnames(aseg_stats_ABIDE2)[1] <- "SUB_ID"
+
+
+#lets first exclude those that had a freesurfer error (according to Jente)
+fs_errors <- c(29733, 29740, 28682, 50049, 29759, 29742, 29746, 29736, 29741, 29599)
+
+sum(fs_errors %in% ABIDEall_pheno_clean$SUB_ID)  # 4 still in the data, the rest were already excluded
+
+ABIDE1_pheno_clean <- ABIDE1_pheno_clean %>% filter(!SUB_ID %in% fs_errors)
+ABIDE2_pheno_clean <- ABIDE2_pheno_clean %>% filter(!SUB_ID %in% fs_errors)
+aseg_stats_ABIDE1  <- aseg_stats_ABIDE1  %>% filter(!SUB_ID %in% fs_errors)
+aseg_stats_ABIDE2  <- aseg_stats_ABIDE2  %>% filter(!SUB_ID %in% fs_errors)
+
+# sanity checks: should all be empty
+fs_errors[fs_errors %in% aseg_stats_ABIDE1$SUB_ID]
+fs_errors[fs_errors %in% aseg_stats_ABIDE2$SUB_ID]
+fs_errors[fs_errors %in% ABIDE1_pheno_clean$SUB_ID]
+fs_errors[fs_errors %in% ABIDE2_pheno_clean$SUB_ID]
+
+
+## Align FreeSurfer output with the cleaned phenotypic data
+# ABIDE I: keep only FreeSurfer rows of subjects that survived steps 1-3, and add their site
+ABIDE1_aseg_clean <- aseg_stats_ABIDE1 %>%
+  filter(SUB_ID %in% ABIDE1_pheno_clean$SUB_ID) %>%
+  left_join(ABIDE1_pheno_clean %>% select(SUB_ID, SITE_ID), by = "SUB_ID")
+
+all(ABIDE1_aseg_clean$SUB_ID %in% ABIDE1_pheno_clean$SUB_ID)  # sanity check: should be TRUE
+
+nrow(aseg_stats_ABIDE1)   # all FreeSurfer rows: 1087
+nrow(ABIDE1_aseg_clean)   # FreeSurfer rows after alignment: 933
+nrow(ABIDE1_pheno_clean)  # subjects in phenotypic data: 934
+
+# Subjects in the phenotypic data without FreeSurfer output -> exclude (50023)
+missing_ABIDE1 <- setdiff(ABIDE1_pheno_clean$SUB_ID, aseg_stats_ABIDE1$SUB_ID)
+missing_ABIDE1
+
+ABIDE1_pheno_clean <- ABIDE1_pheno_clean %>% filter(!SUB_ID %in% missing_ABIDE1)
+
+
+# ABIDE II: same procedure
+ABIDE2_aseg_clean <- aseg_stats_ABIDE2 %>%
+  filter(SUB_ID %in% ABIDE2_pheno_clean$SUB_ID) %>%
+  left_join(ABIDE2_pheno_clean %>% select(SUB_ID, SITE_ID), by = "SUB_ID")
+
+all(ABIDE2_aseg_clean$SUB_ID %in% ABIDE2_pheno_clean$SUB_ID)  # sanity check: should be TRUE
+
+nrow(aseg_stats_ABIDE2)   # all FreeSurfer rows: 1116
+nrow(ABIDE2_aseg_clean)   # FreeSurfer rows after alignment: 1019
+nrow(ABIDE2_pheno_clean)  # subjects in phenotypic data: 1022
+
+# Subjects in the phenotypic data without FreeSurfer output -> exclude (29297, 29303, 29749)
+missing_ABIDE2 <- setdiff(ABIDE2_pheno_clean$SUB_ID, aseg_stats_ABIDE2$SUB_ID)
+missing_ABIDE2
+
+ABIDE2_pheno_clean <- ABIDE2_pheno_clean %>% filter(!SUB_ID %in% missing_ABIDE2)
+
+
+
+## MAD threshold on SurfaceHoles, per site
+sum(is.na(ABIDE1_aseg_clean$SITE_ID))  # sanity check: should be 0
+sum(is.na(ABIDE2_aseg_clean$SITE_ID))  # sanity check: should be 0
+
+sum(is.na(ABIDE1_aseg_clean$SurfaceHoles))  # subjects without a SurfaceHoles value
+sum(is.na(ABIDE2_aseg_clean$SurfaceHoles))
+
+xall <- bind_rows(
+  ABIDE1_aseg_clean %>% filter(!is.na(SurfaceHoles)),
+  ABIDE2_aseg_clean %>% filter(!is.na(SurfaceHoles))
+)
+
+# Exclude subjects with SurfaceHoles > median + 3 * MAD of their site
+ABIDE_sitewise_all <- xall %>%
+  group_by(dataset, SITE_ID) %>%
+  mutate(
+    median_sw = median(SurfaceHoles, na.rm = TRUE),
+    mad_sw    = mad(SurfaceHoles, na.rm = TRUE),
+    mad3_sw   = median_sw + 3 * mad_sw,
+    keep      = SurfaceHoles <= mad3_sw
+  ) %>%
+  ungroup()
+
+ABIDE_final_sitewise_all <- ABIDE_sitewise_all %>% filter(keep)
+
+excluded_ids <- ABIDE_sitewise_all %>%
+  filter(!keep) %>%
+  pull(SUB_ID) %>%
+  unique()
+
+excluded_sitewise <- nrow(xall) - nrow(ABIDE_final_sitewise_all)
+excluded_sitewise  # 92
+
+
+# Apply the same exclusions to the phenotypic data
+ABIDE1_pheno_sitewise_clean <- ABIDE1_pheno_clean %>% filter(!SUB_ID %in% excluded_ids)
+ABIDE2_pheno_sitewise_clean <- ABIDE2_pheno_clean %>% filter(!SUB_ID %in% excluded_ids)
+
+sum(ABIDE1_pheno_sitewise_clean$SUB_ID %in% excluded_ids)  # sanity check: should be 0
+sum(ABIDE2_pheno_sitewise_clean$SUB_ID %in% excluded_ids)  # sanity check: should be 0
+
+ABIDEall_pheno_sitewise <- bind_rows(ABIDE1_pheno_sitewise_clean, ABIDE2_pheno_sitewise_clean)
+
+# Saving the data
+# saveRDS(ABIDE_final_sitewise_all, '/Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer/Scripts/R Studio/data/ABIDE_final_sitewise_all.rds')
+# 
+# saveRDS(ABIDE1_pheno_sitewise_clean,'/Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer/Scripts/R Studio/data/ABIDE1_pheno_sitewise_clean.rds' )
+# 
+# saveRDS(ABIDE2_pheno_sitewise_clean,'/Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer/Scripts/R Studio/data/ABIDE2_pheno_sitewise_clean.rds' )
+# 
+# saveRDS(ABIDEall_pheno_sitewise,'/Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer/Scripts/R Studio/data/ABIDEall_pheno_sitewise.rds' )
+```
+
+# 5) QOALA 
+Automated QC of the FreeSurfer output with the Qoala-T model (Klapwijk et al., 2019).
+The first part follows the original Qoala-T script. Subjects with a Qoala-T score < 40 are excluded.
+
+```{r QOALA}
+# Packages needed by the Qoala-T model
+packages <- c("caret", "corrplot", "gbm", "plyr", "randomForest", "e1071",
+              "pROC", "dplyr", "pbkrtest", "car", "doParallel", "ROSE", "repmis", "ggplot2", "readr")
+if (length(setdiff(packages, rownames(installed.packages()))) > 0) {
+  install.packages(setdiff(packages, rownames(installed.packages())))
+}
+invisible(lapply(packages, library, character.only = TRUE))
+
+outputFolder <- '/Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer/Output/Output_Qoala_T'
+if (!dir.exists(outputFolder)) dir.create(outputFolder)
+
+dataset_name <- "ABIDE"
+
+# FreeSurfer stats of all subjects (output of Stats2Table, see
+# https://github.com/Qoala-T/QC/blob/master/Scripts/Stats2Table/Stats2Table.R)
+test_data <- read.csv('/Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer/Output/FreeSurfer/FreeSurfer_Output_ABIDE.csv',
+                      header = TRUE)
+
+# Phenotypic data after step 1 (used to add the site to each prediction)
+ABIDEall_pheno <- readRDS('/Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer/Scripts/R Studio/data/ABIDEall_pheno_BC.rds')
+
+
+## Run the Qoala-T model (trained on the BrainTime data)
+rf.tune <- get(load(url("https://github.com/Qoala-T/QC/blob/master/Qoala_T_model.Rdata?raw=true")))
+
+# Keep only the variables the model uses, and only complete cases
+dataset_colnames <- names(rf.tune$trainingData)[-ncol(rf.tune$trainingData)]
+testing <- test_data[, dataset_colnames]
+keep    <- complete.cases(testing)
+testing <- testing[keep, ]
+rownames(testing) <- test_data$SUB_ID[keep]  # use subject IDs as row names
+
+rf.pred  <- predict(rf.tune, testing)                # include / exclude
+rf.probs <- predict(rf.tune, testing, type = "prob") # probability of each class
+head(rf.probs)
+
+# plyr is only needed by the model. Detatch it because otherwise it causes issues later on
+detach("package:plyr")
+
+
+## Collect the predictions
+Qoala_T_predictions <- data.frame(
+  participant_id    = rownames(rf.probs),
+  Scan_QoalaT       = rf.probs$Include * 100,
+  Recommendation    = rf.pred,
+  manual_QC_adviced = ifelse(rf.probs$Include * 100 < 70 & rf.probs$Include * 100 > 30, "yes", "no")
+)
+Qoala_T_predictions <- Qoala_T_predictions[order(Qoala_T_predictions$Scan_QoalaT,
+                                                 Qoala_T_predictions$participant_id), ]
+
+write.csv(Qoala_T_predictions,
+          file = file.path(outputFolder, paste0("Qoala_T_predictions_model_based_", dataset_name, ".csv")),
+          row.names = FALSE)
+
+# Add the site to each prediction
+Qoala_T_predictions$participant_id <- trimws(as.character(Qoala_T_predictions$participant_id))
+ABIDEall_pheno$SUB_ID              <- trimws(as.character(ABIDEall_pheno$SUB_ID))
+
+Qoala_T_predictions <- Qoala_T_predictions %>%
+  left_join(ABIDEall_pheno %>% select(SUB_ID, SITE_ID),
+            by = c("participant_id" = "SUB_ID"))
+
+sum(Qoala_T_predictions$participant_id %in% ABIDEall_pheno$SUB_ID)  # 2162
+sum(is.na(Qoala_T_predictions$SITE_ID))  # 28: subjects already excluded in step 1 (longitudinal / coverage)
+
+
+## Apply a custom threshold of 40
+Qoala_T_predictions$Recommendation_custom4 <-
+  ifelse(Qoala_T_predictions$Scan_QoalaT >= 40, "Include", "Exclude")
+
+excluded_ids_custom4 <- Qoala_T_predictions$participant_id[
+  Qoala_T_predictions$Recommendation_custom4 == "Exclude"]
+length(excluded_ids_custom4)  # 241 in the full (uncleaned) dataset
+
+# Data after step 4
+ABIDE_final_sitewise_all <- readRDS('/Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer/Scripts/R Studio/data/ABIDE_final_sitewise_all.rds')
+ABIDE_pheno_sitewise_all <- readRDS('/Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer/Scripts/R Studio/data/ABIDEall_pheno_sitewise.rds')
+
+overlap_ids_custom4 <- excluded_ids_custom4[excluded_ids_custom4 %in% ABIDE_final_sitewise_all$SUB_ID]
+length(overlap_ids_custom4)  # 120 still in the cleaned data -> exclude
+
+ABIDEall_aseg_afterQOALA  <- ABIDE_final_sitewise_all[!(ABIDE_final_sitewise_all$SUB_ID %in% excluded_ids_custom4), ]
+ABIDEall_pheno_afterQOALA <- ABIDE_pheno_sitewise_all[!(ABIDE_pheno_sitewise_all$SUB_ID %in% excluded_ids_custom4), ]
+
+
+# Save this step
+# write_csv(ABIDEall_aseg_afterQOALA,'/Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer/Scripts/R Studio/data/data_final/ABIDEall_aseg_afterQOALA.csv')
+# write_csv(ABIDEall_pheno_afterQOALA,'/Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer/Scripts/R Studio/data/data_final/ABIDEall_pheno_afterQOALA.csv')
+# 
+# saveRDS(ABIDEall_aseg_afterQOALA,'/Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer/Scripts/R Studio/data/data_final/ABIDEall_aseg_afterQOALA.rds')
+# saveRDS(ABIDEall_pheno_afterQOALA,'/Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer/Scripts/R Studio/data/data_final/ABIDEall_pheno_afterQOALA.rds')
+# 
+
+
+# Plot: threshold 50 (default) vs. 40, in the cleaned sample
+library(patchwork)
+
+ABIDE_final_sitewise_all <- readRDS('/Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer/Scripts/R Studio/data/ABIDE_final_sitewise_all.rds')
+
+# restrict to the cleaned dataset
+qoala_clean <- Qoala_T_predictions %>%
+  filter(participant_id %in% as.character(ABIDE_final_sitewise_all$SUB_ID))
+
+nrow(qoala_clean)  # check: should match the cleaned sample
+
+make_qoala_plot <- function(df, threshold, panel_label) {
+  df$Rec <- factor(ifelse(df$Scan_QoalaT >= threshold, "Include", "Exclude"),
+                   levels = c("Exclude", "Include"))
+  n_excl <- sum(df$Rec == "Exclude")
+  n_incl <- sum(df$Rec == "Include")
+
+  ggplot(df, aes(x = Scan_QoalaT, y = 1, colour = Rec)) +
+    annotate("rect", xmin = 30, xmax = 70, ymin = 0.85, ymax = 1.15,
+             alpha = 0.15, fill = "grey40") +
+    geom_jitter(alpha = 0.6, height = 0.1, width = 0, size = 0.8) +
+    geom_vline(xintercept = threshold, linetype = "dashed", linewidth = 0.4) +
+    annotate("text", x = 2, y = 1.22, hjust = 0, size = 2.5,
+             label = paste0("Excluded = ", n_excl)) +
+    annotate("text", x = 98, y = 1.22, hjust = 1, size = 2.5,
+             label = paste0("Included = ", n_incl)) +
+    scale_colour_manual(values = c(Exclude = "#CF4A30", Include = "#88A825"),
+                        name = NULL, drop = FALSE) +
+    scale_x_continuous(limits = c(0, 100), breaks = seq(0, 100, 20)) +
+    scale_y_continuous(limits = c(0.82, 1.26)) +
+    labs(x = "Qoala-T score", y = NULL,
+         title = panel_label,
+         subtitle = paste0("Threshold = ", threshold)) +
+    theme_minimal(base_size = 7) +
+    theme(panel.grid = element_blank(),
+          axis.text.y = element_blank(),
+          axis.ticks.y = element_blank(),
+          axis.line.x = element_line(linewidth = 0.3),
+          plot.title = element_text(face = "bold", size = 8),
+          plot.subtitle = element_text(size = 7),
+          legend.position = "bottom")
+}
+
+p50 <- make_qoala_plot(qoala_clean, 50, "a")
+p40 <- make_qoala_plot(qoala_clean, 40, "b")
+
+p_qoala <- (p50 / p40) + plot_layout(guides = "collect") &
+  theme(legend.position = "bottom")
+
+ggsave('/Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer/Output/Plots/Qoala_clean_50_vs_40.png',
+       p_qoala, width = 16, height = 10, units = "cm", dpi = 300)
+```
+
+
+# Merging sites that contributed to both ABIDE I and ABIDE II (sometimes the name varies)
+```{r}
+# Data after step 5
+ABIDEall_pheno_afterQOALA <- readRDS('/Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer/Scripts/R Studio/data/data_final/ABIDEall_pheno_afterQOALA.rds')
+
+unique(ABIDEall_pheno_afterQOALA$SITE_ID)
+
+# Sites that scanned for both ABIDE I and ABIDE II (ABIDE website) are merged into one site:
+#   KKI    + ABIDEII-KKI_1
+#   NYU    + ABIDEII-NYU_1
+#   SDSU   + ABIDEII-SDSU_1
+#   UCLA_1 + ABIDEII-UCLA_1
+#   USM    + ABIDEII-USM_1
+#   TCD    + ABIDEII-TCD_1
+
+ABIDEall_pheno_mergedsites <- ABIDEall_pheno_afterQOALA %>%
+  mutate(
+    SITE_ID = case_when(
+      SITE_ID %in% c("KKI",    "ABIDEII-KKI_1")  ~ "KKI_merged",
+      SITE_ID %in% c("NYU",    "ABIDEII-NYU_1")  ~ "NYU_merged",
+      SITE_ID %in% c("TCD",    "ABIDEII-TCD_1")  ~ "TCD_merged",
+      SITE_ID %in% c("SDSU",   "ABIDEII-SDSU_1") ~ "SDSU_merged",
+      SITE_ID %in% c("UCLA_1", "ABIDEII-UCLA_1") ~ "UCLA_1_merged",
+      SITE_ID %in% c("USM",    "ABIDEII-USM_1")  ~ "USM_merged",
+      TRUE ~ SITE_ID
+    )
+  )
+
+table(ABIDEall_pheno_mergedsites$SITE_ID)  # subjects per site after merging
+
+
+# Save this step
+#saveRDS(ABIDEall_pheno_mergedsites,'/Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer/Scripts/R Studio/data/data_final/ABIDEall_pheno_merged.rds' )
+
+```
+
+# 6) Comorbidities, age and sex ratio per site
+```{r}
+
+# Data after site merging
+ABIDEall_pheno_merged <- readRDS('/Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer/Scripts/R Studio/data/data_final/ABIDEall_pheno_merged.rds')
+
+
+## Comorbidities
+# ABIDE I stores comorbidities in COMORBIDITY, ABIDE II in NONASD_PSYDX_LABEL -> combine into one column
+ABIDEall_pheno_merged <- ABIDEall_pheno_merged %>%
+  mutate(COMORBIDITY = coalesce(COMORBIDITY, NONASD_PSYDX_LABEL)) %>%
+  select(-NONASD_PSYDX_LABEL)
+
+# Harmonise missing values: empty strings and "none" -> NA
+x <- trimws(ABIDEall_pheno_merged$COMORBIDITY)
+x[x == "" | tolower(x) == "none"] <- NA
+ABIDEall_pheno_merged$COMORBIDITY <- x
+
+sum(is.na(ABIDEall_pheno_merged$COMORBIDITY))  # 1536 without comorbidity
+sort(table(ABIDEall_pheno_merged$COMORBIDITY), decreasing = TRUE)[1:20]  # most frequent comorbidities
+
+# Comorbidities per site
+ABIDE_table_diagnosis <- ABIDEall_pheno_merged %>%
+  group_by(SITE_ID) %>%
+  summarise(
+    Comorbidity      = sum(!is.na(COMORBIDITY)),
+    Control          = sum(DX_GROUP == 2, na.rm = TRUE),
+    Diagnostic_Group = sum(DX_GROUP == 1, na.rm = TRUE),
+    Total            = n()
+  )
+ABIDE_table_diagnosis
+
+# Exclude controls with a psychiatric diagnosis
+sum(ABIDEall_pheno_merged$DX_GROUP == 2 & !is.na(ABIDEall_pheno_merged$COMORBIDITY))  # 22
+
+ABIDEall_pheno_merged <- ABIDEall_pheno_merged %>%
+  filter(!(DX_GROUP == 2 & !is.na(COMORBIDITY)))
+
+
+## Age and sex per site (participants aged <= 30.5 years)
+ABIDE_under30_overview <- ABIDEall_pheno_merged %>%
+  filter(AGE_AT_SCAN <= 30.5) %>%
+  group_by(SITE_ID) %>%
+  summarise(
+    Male_Autism    = sum(SEX == 1 & DX_GROUP == 1, na.rm = TRUE),
+    Male_Control   = sum(SEX == 1 & DX_GROUP == 2, na.rm = TRUE),
+    Female_Autism  = sum(SEX == 2 & DX_GROUP == 1, na.rm = TRUE),
+    Female_Control = sum(SEX == 2 & DX_GROUP == 2, na.rm = TRUE),
+    Total          = n()
+  )
+
+# Plot group sizes per site with possible cut-offs (3, 5, 10)
+overview_long <- ABIDE_under30_overview %>%
+  pivot_longer(cols = c(Male_Autism, Male_Control, Female_Autism, Female_Control),
+               names_to = "Group", values_to = "Count")
+
+p_sites <- ggplot(overview_long, aes(SITE_ID, Count, fill = Group)) +
+  geom_col(position = "dodge") +
+  geom_hline(yintercept = c(3, 5, 10)) +
+  theme(axis.text.x = element_text(angle = 90))
+p_sites
+
+ggsave("/Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer/Output/Plots/ABIDEu30_site_female_cutoffs.pdf",
+       plot = p_sites, width = 12, height = 6)
+
+# Keep sites with at least 3 participants in every sex x diagnosis group
+site_ok <- with(ABIDE_under30_overview,
+                Male_Autism >= 3 & Male_Control >= 3 & Female_Autism >= 3 & Female_Control >= 3)
+
+valid_sites_gender <- ABIDE_under30_overview$SITE_ID[site_ok]
+sum(site_ok)                                 # number of sites kept
+sum(ABIDE_under30_overview$Total[site_ok]) # number of participants kept
+included_sites <- ABIDE_under30_overview$SITE_ID[site_ok]
+included_sites
+
+# excluded sites
+excluded_sites <- ABIDE_under30_overview$SITE_ID[!site_ok]
+excluded_sites
+
+## Final sample
+ABIDEall_filtered_under30 <- ABIDEall_pheno_merged %>%
+  filter(AGE_AT_SCAN <= 30.5,
+         SITE_ID %in% valid_sites_gender)
+
+# Overview per site
+ABIDE_final_overview_per_site <- ABIDEall_filtered_under30 %>%
+  group_by(SITE_ID) %>%
+  summarise(
+    Control_total = sum(DX_GROUP == 2, na.rm = TRUE),
+    Autism_total  = sum(DX_GROUP == 1, na.rm = TRUE),
+    Total         = n()
+  )
+ABIDE_final_overview_per_site
+
+# Overall overview
+ABIDE_final_overview_total <- ABIDEall_filtered_under30 %>%
+  summarise(
+    Control_total  = sum(DX_GROUP == 2, na.rm = TRUE),
+    Autism_total   = sum(DX_GROUP == 1, na.rm = TRUE),
+    Male_Autism    = sum(SEX == 1 & DX_GROUP == 1, na.rm = TRUE),
+    Male_Control   = sum(SEX == 1 & DX_GROUP == 2, na.rm = TRUE),
+    Female_Autism  = sum(SEX == 2 & DX_GROUP == 1, na.rm = TRUE),
+    Female_Control = sum(SEX == 2 & DX_GROUP == 2, na.rm = TRUE),
+    Total          = n()
+  )
+ABIDE_final_overview_total
+
+
+# Save the final sample
+# saveRDS(ABIDEall_filtered_under30,   '/Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer/Scripts/R Studio/data/data_final/ABIDE_FINAL_under30.rds')
+# write_csv(ABIDEall_filtered_under30, '/Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer/Scripts/R Studio/data/data_final/ABIDE_FINAL_under30.csv')
+
+
+#final sample file for FLICA run
+final_sample_u30 <- readRDS('/Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer/Scripts/R Studio/data/data_final/ABIDE_FINAL_under30.rds')
+
+write.table(
+  final_sample_u30$SUB_ID,
+  file = "/Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer/Input/ABIDEu30_final_subs.txt",
+  row.names = FALSE,
+  col.names = FALSE,
+  quote = FALSE
+)
+
+## Figure for the thesis: age distribution before the age cut-off
+theme_apa <- function(base_size = 11, base_family = "sans") {
+  theme_classic(base_size = base_size, base_family = base_family) +
+    theme(
+      axis.text        = element_text(colour = "black", size = base_size - 1),
+      axis.title       = element_text(size = base_size),
+      legend.position  = "top",
+      legend.title     = element_blank(),
+      legend.text      = element_text(size = base_size - 1),
+      strip.background = element_blank(),
+      strip.text       = element_text(size = base_size, hjust = 0),
+      panel.grid       = element_blank()
+    )
+}
+
+age_cutoff <- 30  # dashed line in the plot (the filter itself uses <= 30.5)
+
+pheno_plot <- ABIDEall_pheno_merged %>%
+  mutate(
+    Diagnosis = factor(DX_GROUP, levels = c(1, 2), labels = c("Autism", "Control")),
+    Sex       = factor(SEX,      levels = c(1, 2), labels = c("Male", "Female"))
+  )
+
+p_age <- ggplot(pheno_plot, aes(x = AGE_AT_SCAN, fill = Diagnosis)) +
+  geom_histogram(binwidth = 5, boundary = 0, closed = "left",
+                 colour = "black", linewidth = 0.3) +
+  geom_vline(xintercept = age_cutoff, linetype = "dashed") +
+  facet_wrap(~ Sex, ncol = 1, scales = "free_y") +
+  scale_fill_manual(values = c(Autism = "grey30", Control = "grey80")) +
+  scale_x_continuous(breaks = seq(0, 70, 10), expand = expansion(mult = c(0, .02))) +
+  scale_y_continuous(expand = expansion(mult = c(0, .05))) +
+  labs(x = "Age at scan (years)", y = "Number of participants") +
+  theme_apa()
+p_age
+
+ggsave("/Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer/Output/Plots/ABIDE_age_distribution_thesis.pdf",
+       plot = p_age, width = 6.5, height = 5, units = "in", device = cairo_pdf)
+
+# plot thesis
+overview_long <- ABIDE_under30_overview %>%
+  pivot_longer(cols = c(Male_Autism, Female_Autism, Male_Control, Female_Control),
+               names_to = "Group", values_to = "Count") %>%
+  mutate(Group = factor(Group,
+    levels = c("Male_Autism", "Female_Autism", "Male_Control", "Female_Control"),
+    labels = c("Autistic males", "Autistic females", "NAI males", "NAI females")))
+
+p_sites <- ggplot(overview_long, aes(x = SITE_ID, y = Count, fill = Group)) +
+  geom_col(position = position_dodge(width = 0.85), width = 0.8) +
+  geom_hline(yintercept = 3, linetype = "dashed", linewidth = 0.4) +
+  scale_fill_manual(values = c("Autistic males"   = "#2a78d6",
+                               "Autistic females" = "#eb6834",
+                               "NAI males"        = "#1baf7a",
+                               "NAI females"      = "#eda100")) +
+  scale_y_continuous(expand = expansion(mult = c(0, .05))) +
+  labs(x = "Site", y = "Number of participants") +
+  theme_apa() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))
+p_sites
+
+ggsave("/Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer/Output/Plots/ABIDEu30_site_group_counts_thesis.pdf",
+       plot = p_sites, width = 12, height = 6, units = "in", device = cairo_pdf)
+
+
+```
+
