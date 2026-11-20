@@ -1,5 +1,5 @@
 ---
-title: "dominant subjects"
+title: "Dominant Subjects"
 author: "Katharina Bremer"
 date: "2026-11-02"
 output: html_document
