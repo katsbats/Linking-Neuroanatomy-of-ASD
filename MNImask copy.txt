@@ -1,0 +1,14 @@
+#1.5mm mask
+3dresample -master '/Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer/Input/ABIDE_I/Caltech_51465/mri/mwp1mprage.nii' -input /Users/katharinabremer/fsl/data/standard/MNI152_T1_1mm_brain_mask.nii.gz -prefix MNI_mask_resampled1p5.nii -rmode NN
+
+#4mm mask
+~/abin/3dresample \
+  -master /Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer/Data/MNImask/MNI152_T1_4mm_brain.nii.gz \
+  -input /Users/katharinabremer/fsl/data/standard/MNI152_T1_2mm_brain_mask.nii.gz \
+  -prefix /Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer/Data/MNImask/MNI_mask_resampled4mm.nii \
+  -rmode NN
+
+fslinfo /Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer/Data/MNImask/MNI_mask_resampled4mm.nii | grep pixdim
+fslstats /Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer/Data/MNImask/MNI_mask_resampled4mm.nii -R
+
+gzip /Volumes/g_psyplafor_methlab$/Students/Katharina_Bremer/Data/MNImask/MNI_mask_resampled4mm.nii
